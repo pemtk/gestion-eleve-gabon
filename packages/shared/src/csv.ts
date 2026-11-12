@@ -49,11 +49,18 @@ export function parseStudentCsv(text: string, knownClasses: string[]): { rows: C
   const missingColumns = [cols.nom < 0 && 'nom', cols.prenom < 0 && 'prénom', cols.phone < 0 && 'téléphone', cols.classe < 0 && 'classe'].filter(Boolean) as string[];
   if (missingColumns.length) return { rows: [], missingColumns };
 
+  // Un numéro = un compte : deux lignes ne peuvent pas partager le même numéro.
+  const seen = new Set<string>();
   const rows = lines.slice(1).map((raw, i): CsvStudentRow => {
     const c = splitLine(raw, sep);
     const row: CsvStudentRow = { line: i + 2, nom: c[cols.nom] ?? '', prenom: c[cols.prenom] ?? '', phone: c[cols.phone] ?? '', classe: c[cols.classe] ?? '' };
     const error = validateStudentRow(row, knownClasses);
     if (error) row.error = error;
+    else {
+      const phone = normalizePhone(row.phone);
+      if (seen.has(phone)) row.error = 'Numéro en double dans le fichier';
+      seen.add(phone);
+    }
     return row;
   });
   return { rows, missingColumns: [] };

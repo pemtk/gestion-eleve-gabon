@@ -61,6 +61,11 @@ export const forgotSchema = z.object({
   password: passwordSchema.optional(),
 });
 
+/** Définir un mot de passe quand le compte n'en a pas encore (compte créé par l'école, activé par SMS). */
+export const passwordSetSchema = z
+  .object({ next: passwordSchema, confirm: z.string() })
+  .refine((v) => v.next === v.confirm, { path: ['confirm'], message: 'Les deux mots de passe ne sont pas identiques.' });
+
 export const passwordChangeSchema = z
   .object({ current: z.string().min(1), next: passwordSchema, confirm: z.string() })
   .refine((v) => v.next === v.confirm, { path: ['confirm'], message: 'Les deux mots de passe ne sont pas identiques.' });
@@ -161,6 +166,9 @@ export const linkChildSchema = z.object({
   relation: z.enum(['père', 'mère', 'tuteur', 'tutrice', 'autre']),
 });
 
+/** Responsable d'un établissement (compte de direction créé avec l'école, invité par SMS). */
+export const directorSchema = z.object({ name: z.string().trim().min(1, 'Le nom de la direction est obligatoire.'), phone: phoneSchema });
+
 export const organizationSchema = z.object({
   type: z.enum(['École', 'Diocèse', 'Réseau']),
   name: z.string().trim().min(1),
@@ -168,7 +176,12 @@ export const organizationSchema = z.object({
   phone: z.string().default(''),
   email: z.string().default(''),
   parentId: z.string().optional(),
+  /** Direction de l'école : son compte est créé et invité par SMS. Sans objet pour un diocèse ou un réseau. */
+  director: directorSchema.optional(),
 });
+
+/** Premier administrateur de la plateforme (commande `admin:create`). */
+export const platformAdminSchema = z.object({ name: z.string().trim().min(1), phone: phoneSchema, password: passwordSchema });
 
 export const PLANS = ['Essentiel', 'Standard', 'Réseau', 'Diocésain'] as const;
 export type Plan = (typeof PLANS)[number];

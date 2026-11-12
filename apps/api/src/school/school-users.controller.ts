@@ -6,7 +6,8 @@ import { z } from 'zod';
 import { CurrentUser, Roles, schoolOf, type AuthUser } from '../common/auth.js';
 import { DB, type Db } from '../db/db.module.js';
 import { isUniqueViolation } from '../db/errors.js';
-import { assignments, classes, linkRequests, studentParents, students, teachers } from '../db/schema.js';
+import { AccountsService } from '../accounts/accounts.service.js';
+import { assignments, classes, linkRequests, studentParents, students, teachers, users } from '../db/schema.js';
 import { SchoolPolicy } from './school.policy.js';
 
 const csvSchema = z.object({ csv: z.string().min(1) });
@@ -16,19 +17,23 @@ const code = () => String(randomInt(100000, 1000000));
 @Roles('etablissement')
 @Controller('school')
 export class SchoolUsersController {
-  constructor(@Inject(DB) private readonly db: Db, private readonly policy: SchoolPolicy) {}
+  constructor(@Inject(DB) private readonly db: Db, private readonly policy: SchoolPolicy, private readonly accounts: AccountsService) {}
 
+  /** Fiche élève + compte (sans mot de passe, à activer par SMS) dans une même transaction ; le numéro est celui de l'élève. */
   private async insertStudent(schoolId: string, v: { firstName: string; lastName: string; classId: string; phone: string }, smsSent: boolean) {
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
-        const row = { id: randomUUID(), schoolId, ...v, code: code(), activated: false, smsSent };
-        await this.db.transaction(async (tx) => {
-          await tx.insert(students).values(row);
+        const row = await this.db.transaction(async (tx) => {
+          const account = await this.accounts.create({ role: 'eleve', name: `${v.firstName} ${v.lastName}`, phone: v.phone, schoolId, title: 'Élève' }, tx);
+          const r = { id: randomUUID(), schoolId, ...v, userId: account.id, code: code(), activated: false, smsSent };
+          await tx.insert(students).values(r);
           await tx.update(classes).set({ studentCount: sql`${classes.studentCount} + 1` }).where(and(eq(classes.id, v.classId), eq(classes.schoolId, schoolId)));
+          return { r, account };
         });
-        return row;
+        if (smsSent) this.accounts.invite(row.account);
+        return row.r;
       } catch (e) {
-        if (!isUniqueViolation(e)) throw e; // code déjà pris : nouveau tirage
+        if (!isUniqueViolation(e)) throw e; // code parent déjà pris : nouveau tirage (un numéro déjà utilisé est un 409 de AccountsService)
       }
     }
     throw new ConflictException('Impossible de générer un code parent unique.');
@@ -77,7 +82,9 @@ export class SchoolUsersController {
   async sendCode(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     const sid = schoolOf(user);
     await this.policy.require(sid, 'sms');
-    await this.student(id, sid);
+    const st = await this.student(id, sid);
+    const [account] = st.userId ? await this.db.select().from(users).where(eq(users.id, st.userId)) : [];
+    if (account && !account.activated) this.accounts.invite(account);
     return { sent: true };
   }
 
@@ -96,10 +103,18 @@ export class SchoolUsersController {
     const { rows } = parseStudentCsv(body.csv, all.map((c) => c.name));
     const valid = rows.filter((r) => !r.error);
     const sms = (await this.policy.features(sid)).sms;
+    const skipped = rows.filter((r) => r.error).map((r) => ({ line: r.line, reason: r.error! }));
+    let imported = 0;
     for (const r of valid) {
-      await this.insertStudent(sid, { firstName: r.prenom, lastName: r.nom, phone: r.phone, classId: all.find((c) => c.name.toLowerCase() === r.classe.toLowerCase())!.id }, sms);
+      try {
+        await this.insertStudent(sid, { firstName: r.prenom, lastName: r.nom, phone: r.phone, classId: all.find((c) => c.name.toLowerCase() === r.classe.toLowerCase())!.id }, sms);
+        imported++;
+      } catch (e) {
+        if (!(e instanceof ConflictException)) throw e;
+        skipped.push({ line: r.line, reason: 'Numéro déjà utilisé par un autre compte' });
+      }
     }
-    return { imported: valid.length, skipped: rows.length - valid.length };
+    return { imported, skipped: skipped.length, skippedRows: skipped };
   }
 
   /** Enseignants de l'école ; la colonne « Affectations » est calculée (« Maths · 3ème B, 4ème A »). */
@@ -122,8 +137,14 @@ export class SchoolUsersController {
     const sid = schoolOf(user);
     await this.policy.assertWritable(sid);
     await this.policy.require(sid, 'sms');
-    const [teacher] = await this.db.insert(teachers).values({ id: randomUUID(), schoolId: sid, name: body.name, phone: `+241 ${body.phone}`, status: 'Invitation envoyée' }).returning();
-    return { ...teacher!, assignments: '' };
+    const { teacher, account } = await this.db.transaction(async (tx) => {
+      const account = await this.accounts.create({ role: 'enseignant', name: body.name, phone: body.phone, schoolId: sid, title: 'Enseignant' }, tx);
+      const [teacher] = await tx.insert(teachers).values({ id: randomUUID(), schoolId: sid, userId: account.id, name: body.name, phone: `+241 ${account.phone}`, status: 'Invitation envoyée' }).returning();
+      return { teacher: teacher!, account };
+    });
+    this.accounts.invite(account);
+    const { userId: _u, ...rest } = teacher;
+    return { ...rest, assignments: '' };
   }
 
   @Post('teachers/:id/resend')
@@ -132,7 +153,10 @@ export class SchoolUsersController {
     await this.policy.assertWritable(sid);
     const [t] = await this.db.update(teachers).set({ status: 'Invitation envoyée' }).where(and(eq(teachers.id, id), eq(teachers.schoolId, sid))).returning();
     if (!t) throw new NotFoundException();
-    return { ...t, assignments: '' };
+    const [account] = t.userId ? await this.db.select().from(users).where(eq(users.id, t.userId)) : [];
+    if (account && !account.activated) this.accounts.invite(account);
+    const { userId: _u, ...rest } = t;
+    return { ...rest, assignments: '' };
   }
 
   @Get('link-requests')

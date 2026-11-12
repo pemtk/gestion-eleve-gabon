@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { eq } from 'drizzle-orm';
 import { randomInt } from 'node:crypto';
@@ -49,13 +49,19 @@ export class AuthService {
     await this.db.delete(otpCodes).where(eq(otpCodes.phone, phone));
   }
 
+  /** Demande de code depuis l'écran « Activer mon compte » : un SMS n'est envoyé que si le numéro a un compte (réponse identique sinon). */
+  async requestOtpIfAccount(phone: string) {
+    if (await this.findByPhone(phone)) await this.requestOtp(phone);
+    return { sent: true, resendInSeconds: 60 };
+  }
+
   async login(input: LoginInput) {
     const record = await this.findByPhone(input.phone);
     if (input.mode === 'otp') {
       if (!record) throw new UnauthorizedException('Aucun compte avec ce numéro.');
       return { otpRequired: true as const, ...(await this.requestOtp(input.phone)) };
     }
-    if (!record || !record.activated || !verifyPassword(input.password, record.passwordHash)) {
+    if (!record || !record.activated || !record.passwordHash || !verifyPassword(input.password, record.passwordHash)) {
       throw new UnauthorizedException('Numéro ou mot de passe incorrect.');
     }
     return this.session(toSessionUser(record));
@@ -84,16 +90,30 @@ export class AuthService {
   async reset(phone: string, code: string, password: string) {
     if (!isPasswordValid(password)) throw new BadRequestException('Mot de passe trop faible.');
     await this.consumeOtp(phone, code);
-    const done = await this.db.update(users).set({ passwordHash: hashPassword(password) }).where(eq(users.phone, phone)).returning({ id: users.id });
+    const done = await this.db.update(users).set({ passwordHash: hashPassword(password), activated: true }).where(eq(users.phone, phone)).returning({ id: users.id });
     if (!done.length) throw new UnauthorizedException('Aucun compte avec ce numéro.');
     return { ok: true };
   }
 
   async changePassword(userPhone: string, current: string, next: string) {
     const record = await this.findByPhone(userPhone);
-    if (!record || !verifyPassword(current, record.passwordHash)) throw new UnauthorizedException('Mot de passe actuel incorrect.');
+    if (record && !record.passwordHash) throw new ForbiddenException('Ce compte n’a pas encore de mot de passe : définissez-en un.');
+    if (!record || !record.passwordHash || !verifyPassword(current, record.passwordHash)) throw new UnauthorizedException('Mot de passe actuel incorrect.');
     await this.db.update(users).set({ passwordHash: hashPassword(next) }).where(eq(users.phone, userPhone));
     return { ok: true };
+  }
+
+  /** Premier mot de passe d'un compte créé par l'école ou l'administrateur et activé par code SMS. */
+  async setPassword(phone: string, next: string) {
+    const record = await this.findByPhone(phone);
+    if (!record) throw new UnauthorizedException();
+    if (record.passwordHash) throw new ForbiddenException('Un mot de passe existe déjà : utilisez « Changer le mot de passe ».');
+    await this.db.update(users).set({ passwordHash: hashPassword(next) }).where(eq(users.phone, phone));
+    return { ok: true };
+  }
+
+  async hasPassword(phone: string): Promise<boolean> {
+    return !!(await this.findByPhone(phone))?.passwordHash;
   }
 
   async me(phone: string): Promise<SessionUser> {

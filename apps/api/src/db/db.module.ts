@@ -4,6 +4,7 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { join } from 'node:path';
 import pg from 'pg';
 import * as schema from './schema.js';
+import { bootstrapAdmin } from './admin.js';
 import { seedDemo } from './seed.js';
 
 export const DB = Symbol('DB');
@@ -37,6 +38,8 @@ export function databaseUrl(): string {
         if (process.env.SEED_DEMO === 'true' || (process.env.SEED_DEMO !== 'false' && process.env.NODE_ENV !== 'production')) {
           if (await seedDemo(db, { onlyIfEmpty: true })) log.log('Données de démonstration chargées.');
         }
+        // Premier administrateur (déploiement sans base de démonstration).
+        if (await bootstrapAdmin(db)) log.log('Premier administrateur créé (BOOTSTRAP_ADMIN_*).');
         return db;
       },
     },

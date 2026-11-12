@@ -112,6 +112,24 @@ npm run db:seed     -w @sge/api   # REMET À ZÉRO puis charge le jeu de démons
   (index unique sur `client_id`), une tâche n'est validée qu'une fois, les transitions d'un signalement
   confidentiel sont atomiques, les corrections de notes sont historisées.
 
+## Comptes et mise en service d'une école
+
+Un **numéro de téléphone = un compte** sur toute la plateforme. Les comptes créés par quelqu'un d'autre n'ont pas de
+mot de passe : leur titulaire les active avec le **code SMS** (« Code SMS » + son numéro), puis peut choisir un mot de passe.
+
+| Compte | Créé par | Comment |
+| --- | --- | --- |
+| Administrateur de la plateforme | l'exploitant | `ADMIN_PASSWORD=… npm run admin:create -w @sge/api -- --name "Équipe" --phone "07 00 00 00"` (ou, au démarrage, `BOOTSTRAP_ADMIN_PHONE` + `BOOTSTRAP_ADMIN_PASSWORD`, sans effet si un administrateur existe déjà) |
+| Direction d'une école | l'administrateur | lors de la création de l'école (champs « Direction »), SMS d'invitation |
+| Agent, partenaire | l'administrateur | « Utilisateurs institutionnels » ; l'agent n'accède qu'aux écoles de son périmètre |
+| Enseignant | la direction | « Inviter un enseignant » (formule Standard et plus), renvoi possible |
+| Élève | la direction | création manuelle ou import CSV : fiche + compte dans la même transaction, code parent à 6 chiffres |
+| Parent | lui-même | inscription, puis rattachement à ses enfants avec le code parent |
+
+Une école neuve se met donc en service **sans base de démonstration** : `SEED_DEMO=false`, création de l'administrateur,
+création de l'école et de sa direction, puis classes, enseignants et élèves. Le parcours complet est testé dans
+`apps/api/test/accounts.e2e-spec.ts`.
+
 ## CI/CD (GitHub Actions)
 
 | Workflow | Déclencheur | Rôle |

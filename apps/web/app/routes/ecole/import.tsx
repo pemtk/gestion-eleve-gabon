@@ -17,7 +17,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 export async function action({ request }: Route.ActionArgs) {
   const api = await spaceApi(request, 'ecole');
   const fd = await request.formData();
-  return run(() => api.post<{ imported: number }>('/school/students/import/confirm', { csv: str(fd, 'csv') }), 'Import terminé.');
+  return run(() => api.post<{ imported: number; skipped: number }>('/school/students/import/confirm', { csv: str(fd, 'csv') }), (r) => `Import terminé : ${r.imported} compte${r.imported > 1 ? 's' : ''} créé${r.imported > 1 ? 's' : ''}${r.skipped ? `, ${r.skipped} ligne${r.skipped > 1 ? 's' : ''} ignorée${r.skipped > 1 ? 's' : ''}` : ''}. Chaque élève active son compte avec le code SMS.`);
 }
 
 const STEPS = ['Modèle', 'Fichier', 'Vérification', 'Validation'];

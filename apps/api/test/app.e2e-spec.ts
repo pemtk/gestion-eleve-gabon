@@ -49,7 +49,7 @@ describe('API (e2e, PostgreSQL)', () => {
     const ecole = await token_('etablissement');
     const admin = await token_('admin');
     await api_().get('/dashboard/ecole/network').set(as_(ecole)).expect(403); // Standard : pas de vue réseau
-    await api_().post('/school/teachers/invite').set(as_(ecole)).send({ name: 'Rachel N.', phone: '07 41 02 66' }).expect(201);
+    await api_().post('/school/teachers/invite').set(as_(ecole)).send({ name: 'Rachel N.', phone: '07 41 02 99' }).expect(201);
 
     await api_().put('/admin/subscriptions/o2').set(as_(admin)).send({ plan: 'Standard', period: 'annuelle', start: '2026-01-01', end: '2026-12-31', active: false }).expect(200);
     const blocked = await api_().post('/school/classes').set(as_(ecole)).send({ level: 'Collège', name: '6ème D', capacity: 40 }).expect(403);
