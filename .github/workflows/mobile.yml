@@ -33,7 +33,7 @@ jobs:
       - name: Vérifier le secret EXPO_TOKEN
         run: |
           if [ -z "$EXPO_TOKEN" ]; then echo "::warning::EXPO_TOKEN absent : étape EAS ignorée."; echo "SKIP=1" >> "$GITHUB_ENV"; fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: env.SKIP != '1'
       - uses: actions/setup-node@v4
         if: env.SKIP != '1'
