@@ -1,4 +1,5 @@
 CREATE TABLE "absences" (
+	"school_id" text NOT NULL,
 	"id" text PRIMARY KEY NOT NULL,
 	"student" text NOT NULL,
 	"class_name" text NOT NULL,
@@ -8,12 +9,15 @@ CREATE TABLE "absences" (
 );
 --> statement-breakpoint
 CREATE TABLE "alert_prefs" (
-	"id" text PRIMARY KEY NOT NULL,
+	"user_id" text NOT NULL,
+	"id" text NOT NULL,
 	"label" text NOT NULL,
-	"on" boolean NOT NULL
+	"on" boolean NOT NULL,
+	CONSTRAINT "alert_prefs_user_id_id_pk" PRIMARY KEY("user_id","id")
 );
 --> statement-breakpoint
 CREATE TABLE "announcements" (
+	"school_id" text NOT NULL,
 	"id" text PRIMARY KEY NOT NULL,
 	"title" text DEFAULT '' NOT NULL,
 	"message" text NOT NULL,
@@ -23,6 +27,7 @@ CREATE TABLE "announcements" (
 );
 --> statement-breakpoint
 CREATE TABLE "assignments" (
+	"school_id" text NOT NULL,
 	"id" text PRIMARY KEY NOT NULL,
 	"teacher" text NOT NULL,
 	"class_name" text NOT NULL,
@@ -32,6 +37,7 @@ CREATE TABLE "assignments" (
 );
 --> statement-breakpoint
 CREATE TABLE "attendance_records" (
+	"school_id" text NOT NULL,
 	"class_id" text NOT NULL,
 	"date" text NOT NULL,
 	"student_id" text NOT NULL,
@@ -41,6 +47,7 @@ CREATE TABLE "attendance_records" (
 );
 --> statement-breakpoint
 CREATE TABLE "cases" (
+	"school_id" text NOT NULL,
 	"id" text PRIMARY KEY NOT NULL,
 	"reporter" text NOT NULL,
 	"class_name" text NOT NULL,
@@ -59,6 +66,7 @@ CREATE TABLE "cases" (
 );
 --> statement-breakpoint
 CREATE TABLE "classes" (
+	"school_id" text NOT NULL,
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
 	"level" text NOT NULL,
@@ -66,7 +74,7 @@ CREATE TABLE "classes" (
 	"student_count" integer DEFAULT 0 NOT NULL,
 	"completion" integer DEFAULT 0 NOT NULL,
 	"alert" text,
-	CONSTRAINT "classes_name_unique" UNIQUE("name")
+	CONSTRAINT "classes_id_school_uq" UNIQUE("id","school_id")
 );
 --> statement-breakpoint
 CREATE TABLE "incidents" (
@@ -100,6 +108,7 @@ CREATE TABLE "learner" (
 );
 --> statement-breakpoint
 CREATE TABLE "link_requests" (
+	"school_id" text NOT NULL,
 	"id" text PRIMARY KEY NOT NULL,
 	"parent" text NOT NULL,
 	"relation" text NOT NULL,
@@ -120,16 +129,17 @@ CREATE TABLE "messages" (
 );
 --> statement-breakpoint
 CREATE TABLE "notification_reads" (
-	"role" text NOT NULL,
+	"user_id" text NOT NULL,
 	"notification_id" text NOT NULL,
-	CONSTRAINT "notification_reads_role_notification_id_pk" PRIMARY KEY("role","notification_id")
+	CONSTRAINT "notification_reads_user_id_notification_id_pk" PRIMARY KEY("user_id","notification_id")
 );
 --> statement-breakpoint
 CREATE TABLE "org_subscriptions" (
 	"org_id" text PRIMARY KEY NOT NULL,
 	"plan" text NOT NULL,
 	"period" text DEFAULT 'annuelle' NOT NULL,
-	"active" boolean DEFAULT true NOT NULL
+	"active" boolean DEFAULT true NOT NULL,
+	"requested_plan" text
 );
 --> statement-breakpoint
 CREATE TABLE "organizations" (
@@ -159,6 +169,7 @@ CREATE TABLE "result_corrections" (
 );
 --> statement-breakpoint
 CREATE TABLE "results" (
+	"school_id" text NOT NULL,
 	"id" text PRIMARY KEY NOT NULL,
 	"student" text NOT NULL,
 	"value" real,
@@ -169,12 +180,13 @@ CREATE TABLE "results" (
 --> statement-breakpoint
 CREATE TABLE "rewards" (
 	"id" text PRIMARY KEY NOT NULL,
+	"owner_id" text NOT NULL,
 	"label" text NOT NULL,
 	"threshold" integer NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "school_years" (
-	"id" text PRIMARY KEY NOT NULL,
+	"school_id" text PRIMARY KEY NOT NULL,
 	"label" text NOT NULL,
 	"start" text NOT NULL,
 	"end" text NOT NULL,
@@ -183,8 +195,10 @@ CREATE TABLE "school_years" (
 );
 --> statement-breakpoint
 CREATE TABLE "settings" (
-	"key" text PRIMARY KEY NOT NULL,
-	"value" jsonb NOT NULL
+	"school_id" text NOT NULL,
+	"key" text NOT NULL,
+	"value" jsonb NOT NULL,
+	CONSTRAINT "settings_school_id_key_pk" PRIMARY KEY("school_id","key")
 );
 --> statement-breakpoint
 CREATE TABLE "student_parents" (
@@ -195,6 +209,7 @@ CREATE TABLE "student_parents" (
 );
 --> statement-breakpoint
 CREATE TABLE "students" (
+	"school_id" text NOT NULL,
 	"id" text PRIMARY KEY NOT NULL,
 	"first_name" text NOT NULL,
 	"last_name" text NOT NULL,
@@ -208,6 +223,7 @@ CREATE TABLE "students" (
 --> statement-breakpoint
 CREATE TABLE "subject_grades" (
 	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" text NOT NULL,
 	"subject" text NOT NULL,
 	"average" real NOT NULL,
 	"coefficient" integer NOT NULL,
@@ -222,6 +238,7 @@ CREATE TABLE "task_invalidations" (
 );
 --> statement-breakpoint
 CREATE TABLE "tasks" (
+	"school_id" text NOT NULL,
 	"id" text PRIMARY KEY NOT NULL,
 	"title" text NOT NULL,
 	"subject" text NOT NULL,
@@ -233,6 +250,7 @@ CREATE TABLE "tasks" (
 );
 --> statement-breakpoint
 CREATE TABLE "teachers" (
+	"school_id" text NOT NULL,
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
 	"phone" text NOT NULL,
@@ -241,6 +259,7 @@ CREATE TABLE "teachers" (
 );
 --> statement-breakpoint
 CREATE TABLE "threads" (
+	"school_id" text NOT NULL,
 	"id" text PRIMARY KEY NOT NULL,
 	"role" text NOT NULL,
 	"initials" text DEFAULT '' NOT NULL,
@@ -250,6 +269,12 @@ CREATE TABLE "threads" (
 	"time" text NOT NULL,
 	"unread" integer DEFAULT 0 NOT NULL,
 	"icon" text
+);
+--> statement-breakpoint
+CREATE TABLE "user_scopes" (
+	"user_id" text NOT NULL,
+	"org_id" text NOT NULL,
+	CONSTRAINT "user_scopes_user_id_org_id_pk" PRIMARY KEY("user_id","org_id")
 );
 --> statement-breakpoint
 CREATE TABLE "users" (
@@ -262,10 +287,13 @@ CREATE TABLE "users" (
 	"organization" text,
 	"password_hash" text NOT NULL,
 	"activated" boolean DEFAULT false NOT NULL,
+	"school_id" text,
+	"photo_visibility" text DEFAULT 'school' NOT NULL,
 	CONSTRAINT "users_phone_unique" UNIQUE("phone")
 );
 --> statement-breakpoint
 CREATE TABLE "visit_reports" (
+	"school_id" text NOT NULL,
 	"id" serial PRIMARY KEY NOT NULL,
 	"school" text NOT NULL,
 	"date" text NOT NULL,
@@ -273,9 +301,35 @@ CREATE TABLE "visit_reports" (
 	"visible_to_school" boolean DEFAULT false NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "absences" ADD CONSTRAINT "absences_school_id_organizations_id_fk" FOREIGN KEY ("school_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "announcements" ADD CONSTRAINT "announcements_school_id_organizations_id_fk" FOREIGN KEY ("school_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "assignments" ADD CONSTRAINT "assignments_school_id_organizations_id_fk" FOREIGN KEY ("school_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "attendance_records" ADD CONSTRAINT "attendance_records_school_id_organizations_id_fk" FOREIGN KEY ("school_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "cases" ADD CONSTRAINT "cases_school_id_organizations_id_fk" FOREIGN KEY ("school_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "classes" ADD CONSTRAINT "classes_school_id_organizations_id_fk" FOREIGN KEY ("school_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "link_requests" ADD CONSTRAINT "link_requests_school_id_organizations_id_fk" FOREIGN KEY ("school_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "messages" ADD CONSTRAINT "messages_thread_id_threads_id_fk" FOREIGN KEY ("thread_id") REFERENCES "public"."threads"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "org_subscriptions" ADD CONSTRAINT "org_subscriptions_org_id_organizations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "result_corrections" ADD CONSTRAINT "result_corrections_result_id_results_id_fk" FOREIGN KEY ("result_id") REFERENCES "public"."results"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "results" ADD CONSTRAINT "results_school_id_organizations_id_fk" FOREIGN KEY ("school_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "school_years" ADD CONSTRAINT "school_years_school_id_organizations_id_fk" FOREIGN KEY ("school_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "settings" ADD CONSTRAINT "settings_school_id_organizations_id_fk" FOREIGN KEY ("school_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "student_parents" ADD CONSTRAINT "student_parents_student_id_students_id_fk" FOREIGN KEY ("student_id") REFERENCES "public"."students"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "students" ADD CONSTRAINT "students_class_id_classes_id_fk" FOREIGN KEY ("class_id") REFERENCES "public"."classes"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "messages_thread_client_uq" ON "messages" USING btree ("thread_id","client_id");
+ALTER TABLE "students" ADD CONSTRAINT "students_school_id_organizations_id_fk" FOREIGN KEY ("school_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "students" ADD CONSTRAINT "students_class_same_school_fk" FOREIGN KEY ("class_id","school_id") REFERENCES "public"."classes"("id","school_id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_school_id_organizations_id_fk" FOREIGN KEY ("school_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "teachers" ADD CONSTRAINT "teachers_school_id_organizations_id_fk" FOREIGN KEY ("school_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "threads" ADD CONSTRAINT "threads_school_id_organizations_id_fk" FOREIGN KEY ("school_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user_scopes" ADD CONSTRAINT "user_scopes_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user_scopes" ADD CONSTRAINT "user_scopes_org_id_organizations_id_fk" FOREIGN KEY ("org_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "users" ADD CONSTRAINT "users_school_id_organizations_id_fk" FOREIGN KEY ("school_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "visit_reports" ADD CONSTRAINT "visit_reports_school_id_organizations_id_fk" FOREIGN KEY ("school_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "absences_school_idx" ON "absences" USING btree ("school_id");--> statement-breakpoint
+CREATE INDEX "cases_school_idx" ON "cases" USING btree ("school_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "classes_school_name_uq" ON "classes" USING btree ("school_id","name");--> statement-breakpoint
+CREATE UNIQUE INDEX "messages_thread_client_uq" ON "messages" USING btree ("thread_id","client_id");--> statement-breakpoint
+CREATE INDEX "students_school_idx" ON "students" USING btree ("school_id");--> statement-breakpoint
+CREATE INDEX "tasks_school_idx" ON "tasks" USING btree ("school_id");--> statement-breakpoint
+CREATE INDEX "teachers_school_idx" ON "teachers" USING btree ("school_id");--> statement-breakpoint
+CREATE INDEX "threads_school_idx" ON "threads" USING btree ("school_id","role");--> statement-breakpoint
+CREATE INDEX "users_school_idx" ON "users" USING btree ("school_id");

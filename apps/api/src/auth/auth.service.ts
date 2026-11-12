@@ -13,7 +13,7 @@ const OTP_TTL_MS = 5 * 60_000;
 const MAX_ATTEMPTS = 5;
 const isProd = () => process.env.NODE_ENV === 'production';
 type UserRow = typeof users.$inferSelect;
-const toSessionUser = (u: UserRow): SessionUser => ({ id: u.id, name: u.name, initials: u.initials, phone: u.phone, role: u.role as Role, title: u.title, organization: u.organization ?? undefined });
+const toSessionUser = (u: UserRow): SessionUser => ({ id: u.id, name: u.name, initials: u.initials, phone: u.phone, role: u.role as Role, title: u.title, organization: u.organization ?? undefined, schoolId: u.schoolId ?? undefined });
 
 @Injectable()
 export class AuthService {
@@ -25,7 +25,7 @@ export class AuthService {
   }
 
   private async session(user: SessionUser) {
-    const payload: AuthUser = { sub: user.id, role: user.role, name: user.name, phone: user.phone };
+    const payload: AuthUser = { sub: user.id, role: user.role, name: user.name, phone: user.phone, schoolId: user.schoolId ?? null };
     return { accessToken: await this.jwt.signAsync(payload), user };
   }
 
@@ -71,7 +71,7 @@ export class AuthService {
   async signup(input: SignupInput) {
     if (await this.findByPhone(input.phone)) throw new ConflictException('Un compte existe déjà avec ce numéro.');
     const name = `${input.firstName} ${input.lastName}`;
-    await this.db.insert(users).values({ id: `u-${input.phone}`, phone: input.phone, name, initials: initials(name), role: 'parent', title: 'Parent', passwordHash: hashPassword(input.password), activated: false });
+    await this.db.insert(users).values({ id: `u-${input.phone}`, phone: input.phone, name, initials: initials(name), role: 'parent', title: 'Parent', schoolId: null, passwordHash: hashPassword(input.password), activated: false });
     return this.requestOtp(input.phone);
   }
 

@@ -10,6 +10,8 @@ export interface SessionUser {
   /** Libellé affiché sous le nom (ex. « Direction · Lycée Léon Mba »). */
   title: string;
   organization?: string;
+  /** Établissement de rattachement (absent pour agent, partenaire et administrateur). */
+  schoolId?: string;
 }
 
 export interface Student {

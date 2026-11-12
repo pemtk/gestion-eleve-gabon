@@ -29,7 +29,7 @@ describe('Base de données PostgreSQL', () => {
   it('refuse deux élèves avec le même code parent (contrainte UNIQUE)', async () => {
     const db = dbOf(app);
     const [first] = await db.select().from(students).limit(1);
-    await expect(db.insert(students).values({ id: 'dup', firstName: 'X', lastName: 'Y', classId: first!.classId, code: first!.code })).rejects.toThrow();
+    await expect(db.insert(students).values({ id: 'dup', schoolId: first!.schoolId, firstName: 'X', lastName: 'Y', classId: first!.classId, code: first!.code })).rejects.toThrow();
   });
 
   it('ne valide une tâche qu’une seule fois même si deux requêtes arrivent ensemble', async () => {
@@ -64,5 +64,11 @@ describe('Base de données PostgreSQL', () => {
     const row = body.rows.find((r: { id: string }) => r.id === 'res0');
     expect(row.value).toBe(17);
     expect(row.history.map((h: { from: number; to: number }) => [h.from, h.to])).toEqual([[15.5, 16], [16, 17]]);
+  });
+
+  it('interdit en base de rattacher un élève à la classe d’une autre école (clé étrangère composite)', async () => {
+    const db = dbOf(app);
+    await expect(db.insert(students).values({ id: 'x-cross', schoolId: 'o6', firstName: 'X', lastName: 'Y', classId: '3b', code: '999999' })).rejects.toThrow();
+    await expect(db.insert(students).values({ id: 'x-ok', schoolId: 'o6', firstName: 'X', lastName: 'Y', classId: 'b6a', code: '999998' })).resolves.toBeDefined();
   });
 });

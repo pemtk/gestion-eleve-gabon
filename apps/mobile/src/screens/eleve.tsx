@@ -22,7 +22,7 @@ export function Home() {
     <Screen gap={22}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <Avatar initials={user?.initials} />
-        <View style={{ flex: 1 }}><H size={28}>Bonjour <H size={28} italic>{user?.name.split(' ')[0]}</H></H><Muted size={12.5}>3ème B · Lycée Léon Mba</Muted></View>
+        <View style={{ flex: 1 }}><H size={28}>Bonjour <H size={28} italic>{user?.name.split(' ')[0]}</H></H><Muted size={12.5}>3ème B{user?.organization ? ` · ${user.organization}` : ''}</Muted></View>
         <Pressable onPress={() => router.push('/eleve/notifications')} accessibilityRole="button" accessibilityLabel="Notifications" style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: C.divider, alignItems: 'center', justifyContent: 'center' }}>
           <Icon name="bell" size={19} />{unread && <View style={{ position: 'absolute', top: 9, right: 10, width: 8, height: 8, borderRadius: 4, backgroundColor: C.accent, borderWidth: 2, borderColor: C.bg }} />}
         </Pressable>

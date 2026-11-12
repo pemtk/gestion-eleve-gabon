@@ -18,7 +18,7 @@ export async function action({ request }: Route.ActionArgs) {
   const api = await spaceApi(request, 'admin');
   const fd = await request.formData();
   const intent = str(fd, 'intent');
-  if (intent === 'apply' || intent === 'refuse') return run(() => api.post(`/admin/subscriptions/requests/${intent}`), intent === 'apply' ? 'Formule appliquée. L’établissement est prévenu.' : 'Demande refusée. L’établissement est prévenu.');
+  if (intent === 'apply' || intent === 'refuse') return run(() => api.post(`/admin/subscriptions/${str(fd, 'orgId')}/request/${intent}`), intent === 'apply' ? 'Formule appliquée. L’établissement est prévenu.' : 'Demande refusée. L’établissement est prévenu.');
   const toggle = intent === 'toggle';
   return run(() => api.put(`/admin/subscriptions/${str(fd, 'id')}`, { plan: str(fd, 'plan'), period: str(fd, 'period'), start: '2026-01-01', end: '2026-12-31', active: toggle ? str(fd, 'active') === 'true' : str(fd, 'wasActive') === 'true' }), toggle ? 'Abonnement mis à jour.' : 'Formule modifiée.');
 }
@@ -32,7 +32,7 @@ export default function Subscriptions({ loaderData: d, actionData }: Route.Compo
         <Notice key={r.organizationId} tone="info">
           <div className="flex flex-wrap items-center gap-3">
             <span className="flex-1">Demande reçue : le {r.organization} souhaite passer de la formule {r.from} à la formule {r.to}.</span>
-            <Form method="post" className="flex gap-2"><Button type="submit" name="intent" value="refuse" variant="secondary">Refuser</Button><Button type="submit" name="intent" value="apply">Appliquer</Button></Form>
+            <Form method="post" className="flex gap-2"><input type="hidden" name="orgId" value={r.organizationId} /><Button type="submit" name="intent" value="refuse" variant="secondary">Refuser</Button><Button type="submit" name="intent" value="apply">Appliquer</Button></Form>
           </div>
         </Notice>
       ))}

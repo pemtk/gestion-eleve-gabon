@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgTable, primaryKey, real, serial, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
+import { boolean, foreignKey, index, integer, jsonb, pgTable, primaryKey, real, serial, text, timestamp, unique, uniqueIndex } from 'drizzle-orm/pg-core';
 
 /* ============================== Comptes et sécurité ============================== */
 export const users = pgTable('users', {
@@ -11,7 +11,10 @@ export const users = pgTable('users', {
   organization: text('organization'),
   passwordHash: text('password_hash').notNull(),
   activated: boolean('activated').notNull().default(false),
-});
+  /** Établissement de rattachement (null pour agent, partenaire et administrateur : profils multi-établissements). */
+  schoolId: text('school_id').references(() => organizations.id),
+  photoVisibility: text('photo_visibility').notNull().default('school'),
+}, (t) => [index('users_school_idx').on(t.schoolId)]);
 
 export const otpCodes = pgTable('otp_codes', {
   phone: text('phone').primaryKey(),
@@ -21,34 +24,43 @@ export const otpCodes = pgTable('otp_codes', {
 });
 
 /** Réglages clé/valeur : abonnement de l'école, référent vie scolaire, visibilité des photos. */
+/** Réglages par établissement (référent vie scolaire…). */
 export const settings = pgTable('settings', {
-  key: text('key').primaryKey(),
+  schoolId: text('school_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  key: text('key').notNull(),
   value: jsonb('value').notNull(),
-});
+}, (t) => [primaryKey({ columns: [t.schoolId, t.key] })]);
+
 
 /* ============================== Établissement ============================== */
 export const classes = pgTable('classes', {
+  schoolId: text('school_id').notNull().references(() => organizations.id),
   id: text('id').primaryKey(),
-  name: text('name').notNull().unique(),
+  name: text('name').notNull(),
   level: text('level').notNull(),
   capacity: integer('capacity').notNull(),
   /** Effectif affiché (les élèves non encore importés y sont comptés). */
   studentCount: integer('student_count').notNull().default(0),
   completion: integer('completion').notNull().default(0),
   alert: text('alert'),
-});
+}, (t) => [uniqueIndex('classes_school_name_uq').on(t.schoolId, t.name), unique('classes_id_school_uq').on(t.id, t.schoolId)]);
 
 export const students = pgTable('students', {
+  schoolId: text('school_id').notNull().references(() => organizations.id),
   id: text('id').primaryKey(),
   firstName: text('first_name').notNull(),
   lastName: text('last_name').notNull(),
-  classId: text('class_id').notNull().references(() => classes.id),
+  classId: text('class_id').notNull(),
   phone: text('phone'),
   /** Code d'invitation parent (6 chiffres). */
   code: text('code').notNull().unique(),
   activated: boolean('activated').notNull().default(false),
   smsSent: boolean('sms_sent').notNull().default(false),
-});
+}, (t) => [
+  index('students_school_idx').on(t.schoolId),
+  // La classe d'un élève doit appartenir à la même école que l'élève (garantie assurée par la base).
+  foreignKey({ columns: [t.classId, t.schoolId], foreignColumns: [classes.id, classes.schoolId], name: 'students_class_same_school_fk' }),
+]);
 
 export const studentParents = pgTable('student_parents', {
   id: serial('id').primaryKey(),
@@ -58,14 +70,16 @@ export const studentParents = pgTable('student_parents', {
 });
 
 export const teachers = pgTable('teachers', {
+  schoolId: text('school_id').notNull().references(() => organizations.id),
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   phone: text('phone').notNull(),
   assignments: text('assignments').notNull().default(''),
   status: text('status').notNull(),
-});
+}, (t) => [index('teachers_school_idx').on(t.schoolId)]);
 
 export const linkRequests = pgTable('link_requests', {
+  schoolId: text('school_id').notNull().references(() => organizations.id),
   id: text('id').primaryKey(),
   parent: text('parent').notNull(),
   relation: text('relation').notNull(),
@@ -75,7 +89,7 @@ export const linkRequests = pgTable('link_requests', {
 });
 
 export const schoolYears = pgTable('school_years', {
-  id: text('id').primaryKey(),
+  schoolId: text('school_id').primaryKey().references(() => organizations.id, { onDelete: 'cascade' }),
   label: text('label').notNull(),
   start: text('start').notNull(),
   end: text('end').notNull(),
@@ -83,7 +97,9 @@ export const schoolYears = pgTable('school_years', {
   terms: jsonb('terms').$type<{ name: string; start: string; end: string; coefficient: number }[]>().notNull(),
 });
 
+
 export const assignments = pgTable('assignments', {
+  schoolId: text('school_id').notNull().references(() => organizations.id),
   id: text('id').primaryKey(),
   teacher: text('teacher').notNull(),
   className: text('class_name').notNull(),
@@ -93,15 +109,17 @@ export const assignments = pgTable('assignments', {
 });
 
 export const absences = pgTable('absences', {
+  schoolId: text('school_id').notNull().references(() => organizations.id),
   id: text('id').primaryKey(),
   student: text('student').notNull(),
   className: text('class_name').notNull(),
   date: text('date').notNull(),
   status: text('status').notNull(),
   justification: text('justification'),
-});
+}, (t) => [index('absences_school_idx').on(t.schoolId)]);
 
 export const results = pgTable('results', {
+  schoolId: text('school_id').notNull().references(() => organizations.id),
   id: text('id').primaryKey(),
   student: text('student').notNull(),
   value: real('value'),
@@ -120,6 +138,7 @@ export const resultCorrections = pgTable('result_corrections', {
 });
 
 export const announcements = pgTable('announcements', {
+  schoolId: text('school_id').notNull().references(() => organizations.id),
   id: text('id').primaryKey(),
   title: text('title').notNull().default(''),
   message: text('message').notNull(),
@@ -130,6 +149,7 @@ export const announcements = pgTable('announcements', {
 
 /** Signalements confidentiels et leur avancement (accusé → évaluation → plan d'action → clôture). */
 export const cases = pgTable('cases', {
+  schoolId: text('school_id').notNull().references(() => organizations.id),
   id: text('id').primaryKey(),
   reporter: text('reporter').notNull(),
   className: text('class_name').notNull(),
@@ -145,10 +165,11 @@ export const cases = pgTable('cases', {
   summary: text('summary'),
   actions: jsonb('actions').$type<{ label: string; owner: string; due: string; done: boolean }[]>().notNull().default([]),
   log: jsonb('log').$type<{ at: string; event: string }[]>().notNull().default([]),
-});
+}, (t) => [index('cases_school_idx').on(t.schoolId)]);
 
 /* ============================== Élève, parent, enseignant ============================== */
 export const tasks = pgTable('tasks', {
+  schoolId: text('school_id').notNull().references(() => organizations.id),
   id: text('id').primaryKey(),
   title: text('title').notNull(),
   subject: text('subject').notNull(),
@@ -157,7 +178,7 @@ export const tasks = pgTable('tasks', {
   status: text('status').notNull().default('todo'),
   estimate: text('estimate').notNull().default('—'),
   position: serial('position'),
-});
+}, (t) => [index('tasks_school_idx').on(t.schoolId)]);
 
 export const taskInvalidations = pgTable('task_invalidations', {
   taskId: text('task_id').notNull(),
@@ -175,6 +196,8 @@ export const learner = pgTable('learner', {
 
 export const subjectGrades = pgTable('subject_grades', {
   id: serial('id').primaryKey(),
+  /** Élève concerné. */
+  userId: text('user_id').notNull(),
   subject: text('subject').notNull(),
   average: real('average').notNull(),
   coefficient: integer('coefficient').notNull(),
@@ -183,17 +206,22 @@ export const subjectGrades = pgTable('subject_grades', {
 
 export const rewards = pgTable('rewards', {
   id: text('id').primaryKey(),
+  /** Parent qui offre la récompense. */
+  ownerId: text('owner_id').notNull(),
   label: text('label').notNull(),
   threshold: integer('threshold').notNull(),
 });
 
 export const alertPrefs = pgTable('alert_prefs', {
-  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  id: text('id').notNull(),
   label: text('label').notNull(),
   on: boolean('on').notNull(),
-});
+}, (t) => [primaryKey({ columns: [t.userId, t.id] })]);
+
 
 export const attendanceRecords = pgTable('attendance_records', {
+  schoolId: text('school_id').notNull().references(() => organizations.id),
   classId: text('class_id').notNull(),
   date: text('date').notNull(),
   studentId: text('student_id').notNull(),
@@ -202,6 +230,7 @@ export const attendanceRecords = pgTable('attendance_records', {
 }, (t) => [primaryKey({ columns: [t.classId, t.date, t.studentId] })]);
 
 export const threads = pgTable('threads', {
+  schoolId: text('school_id').notNull().references(() => organizations.id),
   id: text('id').primaryKey(),
   role: text('role').notNull(),
   initials: text('initials').notNull().default(''),
@@ -211,7 +240,7 @@ export const threads = pgTable('threads', {
   time: text('time').notNull(),
   unread: integer('unread').notNull().default(0),
   icon: text('icon'),
-});
+}, (t) => [index('threads_school_idx').on(t.schoolId, t.role)]);
 
 export const messages = pgTable('messages', {
   id: serial('id').primaryKey(),
@@ -226,11 +255,13 @@ export const messages = pgTable('messages', {
 }, (t) => [uniqueIndex('messages_thread_client_uq').on(t.threadId, t.clientId)]);
 
 export const notificationReads = pgTable('notification_reads', {
-  role: text('role').notNull(),
+  userId: text('user_id').notNull(),
   notificationId: text('notification_id').notNull(),
-}, (t) => [primaryKey({ columns: [t.role, t.notificationId] })]);
+}, (t) => [primaryKey({ columns: [t.userId, t.notificationId] })]);
+
 
 /* ============================== Agent, partenaire, administration ============================== */
+/** Une organisation est une école, un diocèse ou un réseau ; une école est aussi le « tenant » de toutes les données scolaires. */
 export const organizations = pgTable('organizations', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
@@ -246,7 +277,15 @@ export const orgSubscriptions = pgTable('org_subscriptions', {
   plan: text('plan').notNull(),
   period: text('period').notNull().default('annuelle'),
   active: boolean('active').notNull().default(true),
+  /** Formule demandée par l'établissement, en attente de validation. */
+  requestedPlan: text('requested_plan'),
 });
+
+/** Périmètre d'un agent : les établissements dont il a la charge. */
+export const userScopes = pgTable('user_scopes', {
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  orgId: text('org_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+}, (t) => [primaryKey({ columns: [t.userId, t.orgId] })]);
 
 export const institutionalUsers = pgTable('institutional_users', {
   id: serial('id').primaryKey(),
@@ -271,6 +310,7 @@ export const incidents = pgTable('incidents', {
 });
 
 export const visitReports = pgTable('visit_reports', {
+  schoolId: text('school_id').notNull().references(() => organizations.id),
   id: serial('id').primaryKey(),
   school: text('school').notNull(),
   date: text('date').notNull(),

@@ -1,14 +1,12 @@
 import { BadRequestException, Body, Controller, Get, Inject, NotFoundException, Param, Post, Put } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNotNull } from 'drizzle-orm';
 import { inviteSchema, organizationSchema, subscriptionSchema, type Plan } from '@sge/shared';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { Roles } from '../common/auth.js';
 import { DB, type Db } from '../db/db.module.js';
 import { incidents, institutionalUsers, organizations, orgSubscriptions } from '../db/schema.js';
-import { getSetting, setSetting } from '../db/settings.js';
 
-const SCHOOL_ORG_ID = 'o2'; // Lycée Léon Mba : l'établissement de démonstration
 const adminInvite = inviteSchema.extend({ role: z.enum(['agent', 'partenaire']), scopes: z.array(z.string()).min(1, 'Choisissez au moins un périmètre.') });
 
 @Roles('admin')
@@ -39,39 +37,34 @@ export class AdminController {
   @Get('subscriptions')
   async subscriptions() {
     const rows = await this.db.select({ o: organizations, s: orgSubscriptions }).from(organizations).innerJoin(orgSubscriptions, eq(orgSubscriptions.orgId, organizations.id)).orderBy(organizations.id);
-    const { plan, requestedPlan } = await getSetting(this.db, 'subscription');
     return {
       rows: rows.map(({ o, s }) => ({ ...o, plan: s.plan, period: s.period, active: s.active })),
-      requests: requestedPlan ? [{ organizationId: SCHOOL_ORG_ID, organization: 'Lycée Léon Mba', from: plan, to: requestedPlan }] : [],
+      requests: rows.filter(({ s }) => s.requestedPlan).map(({ o, s }) => ({ organizationId: o.id, organization: o.name, from: s.plan as Plan, to: s.requestedPlan as Plan })),
     };
   }
 
   @Put('subscriptions/:orgId')
   async updateSubscription(@Param('orgId') orgId: string, @Body({ schema: subscriptionSchema }) body: z.infer<typeof subscriptionSchema>) {
-    const org = await this.db.transaction(async (tx) => {
+    return this.db.transaction(async (tx) => {
       const [o] = await tx.update(organizations).set({ plan: body.plan, status: body.active ? 'Actif' : 'Suspendu' }).where(eq(organizations.id, orgId)).returning();
       if (!o) throw new NotFoundException('Organisation introuvable.');
       await tx.update(orgSubscriptions).set({ plan: body.plan, period: body.period, active: body.active }).where(eq(orgSubscriptions.orgId, orgId));
       return o;
     });
-    if (orgId === SCHOOL_ORG_ID) {
-      const current = await getSetting(this.db, 'subscription');
-      await setSetting(this.db, 'subscription', { ...current, plan: body.plan, suspended: !body.active });
-    }
-    return org;
   }
 
-  @Post('subscriptions/requests/:decision')
-  async decide(@Param('decision') decision: string) {
-    const sub = await getSetting(this.db, 'subscription');
-    if (!sub.requestedPlan || !['apply', 'refuse'].includes(decision)) throw new NotFoundException('Aucune demande en attente.');
-    const plan: Plan = decision === 'apply' ? sub.requestedPlan : sub.plan;
-    if (decision === 'apply') {
-      await this.db.update(organizations).set({ plan }).where(eq(organizations.id, SCHOOL_ORG_ID));
-      await this.db.update(orgSubscriptions).set({ plan }).where(eq(orgSubscriptions.orgId, SCHOOL_ORG_ID));
-    }
-    await setSetting(this.db, 'subscription', { ...sub, plan, requestedPlan: null });
-    return { plan };
+  /** Accepter ou refuser la demande de formule d'un établissement précis. */
+  @Post('subscriptions/:orgId/request/:decision')
+  async decide(@Param('orgId') orgId: string, @Param('decision') decision: string) {
+    if (!['apply', 'refuse'].includes(decision)) throw new NotFoundException();
+    return this.db.transaction(async (tx) => {
+      const [sub] = await tx.select().from(orgSubscriptions).where(and(eq(orgSubscriptions.orgId, orgId), isNotNull(orgSubscriptions.requestedPlan))).for('update');
+      if (!sub) throw new NotFoundException('Aucune demande en attente.');
+      const plan = decision === 'apply' ? (sub.requestedPlan as Plan) : (sub.plan as Plan);
+      if (decision === 'apply') await tx.update(organizations).set({ plan }).where(eq(organizations.id, orgId));
+      await tx.update(orgSubscriptions).set({ plan, requestedPlan: null }).where(eq(orgSubscriptions.orgId, orgId));
+      return { plan };
+    });
   }
 
   @Get('users')

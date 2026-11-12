@@ -11,6 +11,10 @@ import type { Role, WebSpace } from './roles.js';
 ---------------------------------------------------------------------------- */
 
 export const SCHOOL_NAME = 'Lycée Léon Mba';
+/** Établissements de démonstration (identifiants d'organisation). Chaque donnée scolaire appartient à l'un d'eux. */
+export const DEMO_SCHOOL_ID = 'o2';
+export const SECOND_SCHOOL_ID = 'o6';
+export const SECOND_SCHOOL_NAME = 'Collège Bessieux';
 export const DEMO_PASSWORD = 'motdepasse1';
 
 export const DEMO_USERS: Record<Role, SessionUser> = {
@@ -417,6 +421,9 @@ export const ORGANIZATIONS: Organization[] = [
   { id: 'o3', name: 'Réseau des écoles du Haut-Ogooué', type: 'Réseau', plan: 'Réseau', status: 'Actif', due: '30/06/2027' },
   { id: 'o4', name: 'Collège de Nzeng-Ayong', type: 'École', plan: 'Essentiel', status: 'Essai · 12 j', due: '' },
   { id: 'o5', name: 'École Akébé-Plaine', type: 'École', plan: 'Essentiel', status: 'Suspendu', due: '—' },
+  { id: 'o6', name: 'Collège Bessieux', type: 'École', plan: 'Essentiel', status: 'Actif', due: '30/06/2027', parentId: 'o1' },
+  { id: 'o7', name: 'École Saint-Michel', type: 'École', plan: 'Standard', status: 'Actif', due: '31/12/2026', parentId: 'o1' },
+  { id: 'o8', name: 'Lycée d’Owendo', type: 'École', plan: 'Standard', status: 'Actif', due: '31/12/2026' },
 ];
 /** Prix mensuel indicatif par formule (FCFA) — l'annuel = 10 mois. */
 export const PLAN_PRICES = { Essentiel: 25000, Standard: 60000, Réseau: 140000, Diocésain: 300000 } as const;
@@ -461,3 +468,23 @@ export const IMPORT_PREVIEW: ImportRow[] = [
   { line: 101, nom: 'Ngoua', prenom: 'Mireille', phone: '+241 06 12 33 78', classe: 'Seconde A' },
 ];
 export const IMPORT_TOTALS = { lines: 940, errors: 6 };
+
+/* ---- Second établissement de démonstration : sert à vérifier le cloisonnement entre écoles ---- */
+export const SECOND_SCHOOL_DIRECTOR: SessionUser = {
+  id: 'u-ecole-2', name: 'Marc Obame', initials: 'MO', phone: '07000005', role: 'etablissement',
+  title: `Direction · ${SECOND_SCHOOL_NAME}`, organization: SECOND_SCHOOL_NAME,
+};
+export const SECOND_SCHOOL_DATA = {
+  classes: [
+    { id: 'b6a', name: '6ème A', level: 'Collège' as const, capacity: 45, students: 40, completion: 66 },
+    { id: 'b5a', name: '5ème A', level: 'Collège' as const, capacity: 45, students: 41, completion: 52 },
+  ],
+  students: [
+    { id: 'bs1', firstName: 'Nadège', lastName: 'Bivigou', classId: 'b6a', phone: '07445566', code: '120045', parents: [['Alice Bivigou', 'mère']] as [string, string][] },
+    { id: 'bs2', firstName: 'Kevin', lastName: 'Ayingone', classId: 'b5a', phone: '07556677', code: '230156', parents: [] as [string, string][] },
+  ],
+  teacher: { id: 'bt1', name: 'Hélène Mavoungou', phone: '+241 07 66 77 88', assignments: 'Français · 6ème A', status: 'Activé' as const },
+  absence: { id: 'bab1', student: 'Kevin Ayingone', className: '5ème A', date: '10 nov.', status: 'A' as const, justification: null as string | null },
+  announcement: { id: 'ban1', title: 'Réunion des parents', message: 'Réunion des parents de 6ème A le 18 novembre à 16 h.', audience: 'class', target: '6ème A' },
+  case: { id: 'SC-0201', reporter: 'Enseignant · H. Mavoungou', className: '6ème A', type: 'Mal-être', received: 'hier, 10:15', student: 'Nadège Bivigou', text: 'L’élève s’isole depuis deux semaines et ne participe plus en classe.' },
+};

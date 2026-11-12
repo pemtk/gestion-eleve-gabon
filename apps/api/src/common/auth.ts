@@ -6,7 +6,16 @@ import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import type { Role } from '@sge/shared';
 
-export interface AuthUser { sub: string; role: Role; name: string; phone: string }
+export interface AuthUser { sub: string; role: Role; name: string; phone: string; /** Établissement du compte ; null pour agent, partenaire, administrateur. */ schoolId: string | null }
+
+/**
+ * Établissement de l'utilisateur connecté. Toute requête sur des données scolaires doit filtrer sur cette valeur :
+ * elle vient du jeton signé, jamais du corps ni de l'URL de la requête.
+ */
+export function schoolOf(user: AuthUser): string {
+  if (!user.schoolId) throw new ForbiddenException('Ce compte n’est rattaché à aucun établissement.');
+  return user.schoolId;
+}
 
 const PUBLIC = 'isPublic';
 const ROLES = 'roles';

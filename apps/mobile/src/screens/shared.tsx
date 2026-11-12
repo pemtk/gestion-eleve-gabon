@@ -127,7 +127,7 @@ export function Compte() {
           <Switch value={push} onValueChange={setPush} trackColor={{ true: C.a[300], false: C.n[300] }} thumbColor={push ? C.accent : C.n[500]} accessibilityLabel="Notifications push" /></View>
         {parent && <><Item icon="message-square" label="Relais SMS" value="activé par l’école" /><Item icon="sliders-horizontal" label="Choisir mes alertes" onPress={go('alertes')} /></>}
       </Group>
-      <Group title="Établissements">{parent ? <><Item icon="school" label="Lycée Léon Mba" value="Aïcha" /><Item icon="school" label="École Saint-Michel" value="Junior" /></> : <Item icon="school" label="Lycée Léon Mba" value={user.role === 'enseignant' ? '3 classes' : '3ème B'} />}</Group>
+      <Group title="Établissements">{parent ? <><Item icon="school" label="Lycée Léon Mba" value="Aïcha" /><Item icon="school" label="École Saint-Michel" value="Junior" /></> : <Item icon="school" label={user.organization ?? 'Mon établissement'} value={user.role === 'enseignant' ? '3 classes' : '3ème B'} />}</Group>
       <Group title="Aide"><Item icon="life-buoy" label="Aide et questions fréquentes" onPress={go('aide')} /><Item icon="headset" label="Contacter le support" onPress={go('aide')} />
         <Item icon="shield" label="Confidentialité" onPress={() => void Linking.openURL(`mailto:${SUPPORT.email}?subject=Confidentialité`)} /></Group>
       <Btn variant="secondary" icon="log-out" label="Se déconnecter" onPress={signOut} />

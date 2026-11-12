@@ -8,6 +8,7 @@ import { ActionNotice, Avatar, Button, Field, Input, LinkButton, Notice, Section
 import { run, spaceApi } from '~/lib/api.server';
 import { str } from '~/lib/form';
 import type { ClassRow, LinkRequestRow, StudentRow, SubscriptionInfo, TeacherRow } from '~/lib/types';
+import { useSchoolName } from '~/lib/school';
 import type { Route } from './+types/users';
 
 const TABS = ['eleves', 'profs', 'ratt'] as const;
@@ -53,10 +54,11 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function Users({ loaderData: d, actionData }: Route.ComponentProps) {
+  const school = useSchoolName();
   const link = (tab: string) => `/ecole/utilisateurs?tab=${tab}`;
   return (
     <>
-      <PageHeader kicker="Utilisateurs · Lycée Léon Mba" title="Élèves, enseignants et parents"
+      <PageHeader kicker={`Utilisateurs · ${school}`} title="Élèves, enseignants et parents"
         action={<LinkButton to="/ecole/utilisateurs/import" icon="upload">Importer des élèves</LinkButton>} />
       <Tabs items={[
         { to: link('eleves'), label: 'Élèves', badge: String(d.students.length), active: d.tab === 'eleves' },

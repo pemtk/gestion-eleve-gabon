@@ -7,10 +7,11 @@ import { flag, str } from '~/lib/form';
 import type { Route } from './+types/reports';
 
 type Report = { id: string; school: string; date: string; text: string };
-const SCHOOLS = ['Lycée Léon Mba', 'Collège Bessieux', 'École Saint-Michel', 'Lycée d’Owendo', 'Collège de Nzeng-Ayong', 'École Akébé-Plaine'];
 
 export async function loader({ request }: Route.LoaderArgs) {
-  return { reports: await (await spaceApi(request, 'agent')).get<Report[]>('/agent/reports') };
+  const api = await spaceApi(request, 'agent');
+  const [reports, schools] = await Promise.all([api.get<Report[]>('/agent/reports'), api.get<{ name: string }[]>('/agent/schools')]);
+  return { reports, schools: schools.map((s) => s.name) };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -30,7 +31,7 @@ export default function Reports({ loaderData: d, actionData }: Route.ComponentPr
         <Section title="Observations de la visite">
           <Form method="post" className="flex flex-col gap-4">
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="École"><Select name="school">{SCHOOLS.map((s) => <option key={s}>{s}</option>)}</Select></Field>
+              <Field label="École"><Select name="school">{d.schools.map((s) => <option key={s}>{s}</option>)}</Select></Field>
               <Field label="Date de la visite"><Input name="date" type="date" defaultValue="2026-11-10" required /></Field>
             </div>
             <Field label="Observations"><Textarea name="observations" rows={7} required placeholder="Ce que vous avez constaté, les décisions prises, les points à suivre." /></Field>

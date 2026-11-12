@@ -17,65 +17,66 @@ const toInfo = (c: CaseRow) => ({ id: c.id, reporter: c.reporter, className: c.c
  * Traitement d'un signalement confidentiel (§11.2) :
  * accusé de réception (4 h) → première évaluation (24 h) → plan d'action → clôture avec la directrice.
  * Chaque transition est un UPDATE conditionnel sur l'étape courante : deux clics simultanés ne la passent qu'une fois.
+ * Tous les accès sont limités à l'établissement de l'appelant : un dossier d'une autre école reste introuvable (404).
  */
 @Injectable()
 export class CasesService {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  private async get(id: string): Promise<CaseRow> {
-    const [row] = await this.db.select().from(cases).where(eq(cases.id, id));
+  private async get(id: string, schoolId: string): Promise<CaseRow> {
+    const [row] = await this.db.select().from(cases).where(and(eq(cases.id, id), eq(cases.schoolId, schoolId)));
     if (!row) throw new NotFoundException('Signalement introuvable.');
     return row;
   }
 
-  async list() {
-    return (await this.db.select().from(cases).orderBy(cases.id)).map((c) => ({ ...toInfo(c), step: c.step }));
+  async list(schoolId: string) {
+    return (await this.db.select().from(cases).where(eq(cases.schoolId, schoolId)).orderBy(cases.id)).map((c) => ({ ...toInfo(c), step: c.step }));
   }
 
-  async detail(id: string) {
-    const c = await this.get(id);
+  async detail(id: string, schoolId: string) {
+    const c = await this.get(id, schoolId);
     return { info: toInfo(c), state: toState(c) };
   }
 
-  private async transition(id: string, from: number, set: Partial<typeof cases.$inferInsert>) {
-    await this.get(id);
-    const [row] = await this.db.update(cases).set(set).where(and(eq(cases.id, id), eq(cases.step, from))).returning();
+  private async transition(id: string, schoolId: string, from: number, set: Partial<typeof cases.$inferInsert>) {
+    await this.get(id, schoolId);
+    const [row] = await this.db.update(cases).set(set).where(and(eq(cases.id, id), eq(cases.schoolId, schoolId), eq(cases.step, from))).returning();
     if (!row) throw new BadRequestException('Cette étape n’est pas disponible pour ce dossier.');
     return toState(row);
   }
 
-  acknowledge(id: string) {
-    return this.transition(id, 1, { step: 2, log: logEntry('Accusé de réception · l’auteur est informé') as never });
+  acknowledge(id: string, schoolId: string) {
+    return this.transition(id, schoolId, 1, { step: 2, log: logEntry('Accusé de réception · l’auteur est informé') as never });
   }
 
-  evaluate(id: string, input: z.infer<typeof caseEvaluationSchema>) {
+  evaluate(id: string, schoolId: string, input: z.infer<typeof caseEvaluationSchema>) {
     const event = `Évaluation : gravité ${input.gravity.toLowerCase()}${input.informDirector ? ' · directrice informée' : ''}${input.informFamily ? ' · famille prévenue' : ''}`;
-    return this.transition(id, 2, { step: 3, gravity: input.gravity, measures: input.measures, informDirector: input.informDirector, informFamily: input.informFamily, log: logEntry(event) as never });
+    return this.transition(id, schoolId, 2, { step: 3, gravity: input.gravity, measures: input.measures, informDirector: input.informDirector, informFamily: input.informFamily, log: logEntry(event) as never });
   }
 
-  async addAction(id: string, label: string, owner: string) {
+  async addAction(id: string, schoolId: string, label: string, owner: string) {
     const action = { label, owner, due: 'sous 7 j', done: false };
-    const [row] = await this.db.update(cases).set({ actions: sql`${cases.actions} || ${JSON.stringify([action])}::jsonb` as never, log: logEntry(`Action ajoutée : ${label}`) as never }).where(and(eq(cases.id, id), eq(cases.step, 3))).returning();
-    if (!row) { await this.get(id); throw new BadRequestException('Cette étape n’est pas disponible pour ce dossier.'); }
+    const [row] = await this.db.update(cases).set({ actions: sql`${cases.actions} || ${JSON.stringify([action])}::jsonb` as never, log: logEntry(`Action ajoutée : ${label}`) as never }).where(and(eq(cases.id, id), eq(cases.schoolId, schoolId), eq(cases.step, 3))).returning();
+    if (!row) { await this.get(id, schoolId); throw new BadRequestException('Cette étape n’est pas disponible pour ce dossier.'); }
     return toState(row);
   }
 
-  async toggleAction(id: string, index: number) {
-    const c = await this.get(id);
+  async toggleAction(id: string, schoolId: string, index: number) {
+    const c = await this.get(id, schoolId);
     if (!c.actions[index]) throw new NotFoundException('Action introuvable.');
     const actions = c.actions.map((a, i) => (i === index ? { ...a, done: !a.done } : a));
-    const [row] = await this.db.update(cases).set({ actions }).where(eq(cases.id, id)).returning();
+    const [row] = await this.db.update(cases).set({ actions }).where(and(eq(cases.id, id), eq(cases.schoolId, schoolId))).returning();
     return toState(row!);
   }
 
   /** On ne peut clore un dossier sans plan d'action. */
-  async toClose(id: string) {
-    const c = await this.get(id);
+  async toClose(id: string, schoolId: string) {
+    const c = await this.get(id, schoolId);
     if (c.step === 3 && !c.actions.length) throw new BadRequestException('Ajoutez au moins une action avant la clôture.');
-    return this.transition(id, 3, { step: 4 });
+    return this.transition(id, schoolId, 3, { step: 4 });
   }
 
-  close(id: string, input: z.infer<typeof caseCloseSchema>) {
-    return this.transition(id, 4, { step: 5, summary: input.summary, log: logEntry('Signalement clos avec l’accord de la directrice') as never });
+  close(id: string, schoolId: string, input: z.infer<typeof caseCloseSchema>) {
+    return this.transition(id, schoolId, 4, { step: 5, summary: input.summary, log: logEntry('Signalement clos avec l’accord de la directrice') as never });
   }
 }

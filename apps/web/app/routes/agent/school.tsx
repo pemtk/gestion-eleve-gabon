@@ -6,12 +6,13 @@ import { spaceApi } from '~/lib/api.server';
 import type { Route } from './+types/school';
 
 type School = { name: string; kpis: { label: string; value: string; sub: string }[]; activation: [string, string, number][]; alerts: { icon: string; text: string }[]; entry: number; reports: { id: string; date: string; text: string }[] };
-const NAMES = ['Lycée Léon Mba', 'Collège Bessieux', 'École Saint-Michel', 'Collège de Nzeng-Ayong', 'École Akébé-Plaine'];
+type Row = { name: string };
 
 export async function loader({ request }: Route.LoaderArgs) {
   const api = await spaceApi(request, 'agent');
-  const name = new URL(request.url).searchParams.get('nom') ?? NAMES[0]!;
-  return api.get<School>(`/agent/schools/${encodeURIComponent(name)}`);
+  const names = (await api.get<Row[]>('/agent/schools')).map((r) => r.name);
+  const name = new URL(request.url).searchParams.get('nom') ?? names[0] ?? '';
+  return { ...(await api.get<School>(`/agent/schools/${encodeURIComponent(name)}`)), names };
 }
 
 export default function AgentSchool({ loaderData: s }: Route.ComponentProps) {
@@ -21,7 +22,7 @@ export default function AgentSchool({ loaderData: s }: Route.ComponentProps) {
       <PageHeader kicker="Mes écoles › Fiche" title={s.name} filters={[{ icon: 'calendar', label: 'Cette semaine' }]}
         action={<LinkButton to="/agent/comptes-rendus" icon="file-pen-line">Nouveau compte-rendu</LinkButton>} />
       <Form className="flex items-center gap-2 text-[13px] text-neutral-700"><label className="flex items-center gap-2">École
-        <Select value={s.name} onChange={(e) => setParams({ nom: e.target.value })} className="!w-auto">{NAMES.map((n) => <option key={n}>{n}</option>)}</Select></label></Form>
+        <Select value={s.name} onChange={(e) => setParams({ nom: e.target.value })} className="!w-auto">{s.names.map((n) => <option key={n}>{n}</option>)}</Select></label></Form>
       <div className="grid grid-cols-2 gap-3.5 xl:grid-cols-4">
         {s.kpis.map((k, i) => (
           <div key={k.label} className={`rounded-lg border p-4 ${i === 0 ? 'border-accent-300 bg-accent-100' : 'border-divider'}`}>

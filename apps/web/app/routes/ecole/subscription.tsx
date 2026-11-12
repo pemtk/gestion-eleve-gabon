@@ -6,6 +6,7 @@ import { run, spaceApi } from '~/lib/api.server';
 import { str } from '~/lib/form';
 import { PLAN_FEATURES, PLAN_ORDER, formatInt } from '@sge/shared';
 import type { SubscriptionInfo } from '~/lib/types';
+import { useSchoolName } from '~/lib/school';
 import type { Route } from './+types/subscription';
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -20,10 +21,11 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function Subscription({ loaderData: s }: Route.ComponentProps) {
+  const school = useSchoolName();
   const f = useFetcher<{ ok: boolean; error?: string; message?: string }>();
   return (
     <>
-      <PageHeader kicker="Lycée Léon Mba · Libreville" title="Mon abonnement" />
+      <PageHeader kicker={school} title="Mon abonnement" />
       {f.data?.ok && <Notice>{f.data.message}</Notice>}
       {f.data && !f.data.ok && <Notice tone="error">{f.data.error}</Notice>}
       {s.requestedPlan && (

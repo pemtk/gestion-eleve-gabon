@@ -5,7 +5,6 @@ import { z } from 'zod';
 import { CurrentUser, Roles, type AuthUser } from '../common/auth.js';
 import { DB, type Db } from '../db/db.module.js';
 import { users } from '../db/schema.js';
-import { setSetting } from '../db/settings.js';
 
 const profileSchema = z.object({
   firstName: z.string().trim().min(1), lastName: z.string().trim().min(1),
@@ -21,8 +20,7 @@ export class AccountController {
   @Put('profile')
   async profile(@CurrentUser() user: AuthUser, @Body({ schema: profileSchema }) body: z.infer<typeof profileSchema>) {
     const name = `${body.firstName} ${body.lastName}`;
-    await this.db.update(users).set({ name, initials: initials(name) }).where(eq(users.id, user.sub));
-    await setSetting(this.db, 'photoVisibility', body.photoVisibility);
+    await this.db.update(users).set({ name, initials: initials(name), photoVisibility: body.photoVisibility }).where(eq(users.id, user.sub));
     return { ok: true, name, photoVisibility: body.photoVisibility };
   }
 }

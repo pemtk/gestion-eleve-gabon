@@ -6,6 +6,7 @@ import { ActionNotice, Button, Chips, Field, Input, Section, Select, Tabs, Tag, 
 import { run, spaceApi } from '~/lib/api.server';
 import { flag, str } from '~/lib/form';
 import type { ClassRow, TeacherRow } from '~/lib/types';
+import { useSchoolName } from '~/lib/school';
 import type { Route } from './+types/config';
 
 type Year = typeof SCHOOL_YEAR;
@@ -41,10 +42,11 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function Config({ loaderData: d, actionData }: Route.ComponentProps) {
+  const school = useSchoolName();
   const link = (tab: string) => `/ecole/configuration?tab=${tab}`;
   return (
     <>
-      <PageHeader kicker="Configuration · Lycée Léon Mba" title="Année, classes et affectations" />
+      <PageHeader kicker={`Configuration · ${school}`} title="Année, classes et affectations" />
       <Tabs items={[
         { to: link('annees'), label: 'Années scolaires', active: d.tab === 'annees' },
         { to: link('classes'), label: 'Classes', badge: String(d.classes.length), active: d.tab === 'classes' },
