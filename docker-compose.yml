@@ -1,0 +1,23 @@
+# Démarrage local complet : docker compose up --build
+#   API : http://localhost:3000/api/health      Web : http://localhost:5173
+services:
+  api:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      CORS_ORIGIN: http://localhost:5173
+      # La connexion de démonstration est coupée en NODE_ENV=production.
+    ports: ['3000:3000']
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/api/health']
+      interval: 10s
+      retries: 5
+  web:
+    build: { context: ., dockerfile: apps/web/Dockerfile }
+    environment:
+      API_URL: http://api:3000/api
+      SESSION_SECRET: ${SESSION_SECRET:-change-me-in-production}
+      DEMO_LOGIN: ${DEMO_LOGIN:-false}
+    ports: ['5173:3000']
+    depends_on:
+      api: { condition: service_healthy }

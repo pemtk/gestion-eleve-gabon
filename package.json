@@ -1,0 +1,21 @@
+{
+  "name": "suivi-gestion-eleves",
+  "private": true,
+  "description": "Plateforme de suivi et de gestion des élèves (Gabon) : API NestJS, espace web React Router, application mobile Expo.",
+  "workspaces": ["packages/*", "apps/*"],
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build:packages": "npm run build -w @sge/design-tokens -w @sge/shared",
+    "dev:api": "npm run start:dev -w @sge/api",
+    "dev:web": "npm run dev -w @sge/web",
+    "dev:mobile": "npm run start -w @sge/mobile",
+    "build": "npm run build:packages && npm run build -w @sge/api && npm run build -w @sge/web",
+    "typecheck": "npm run build:packages && npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run build:packages && npm run test --workspaces --if-present",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2"
+  }
+}
