@@ -4,7 +4,7 @@ import { BADGES, OVERALL_AVERAGE, POINTS_HISTORY, selfEvaluationSchema } from '@
 import { z } from 'zod';
 import { CurrentUser, Roles, schoolOf, type AuthUser } from '../common/auth.js';
 import { DB, type Db } from '../db/db.module.js';
-import { learner, subjectGrades, tasks } from '../db/schema.js';
+import { learner, subjectGrades, tasks, workSessions } from '../db/schema.js';
 import { getLearner } from './learner.js';
 
 const POINTS_PER_TASK = 20;
@@ -63,6 +63,7 @@ export class StudentController {
     return this.db.transaction(async (tx) => {
       const [t] = await tx.update(tasks).set({ status: 'done' }).where(and(eq(tasks.id, id), eq(tasks.schoolId, sid), ne(tasks.status, 'done'))).returning();
       if (!t) throw new BadRequestException('Cette tâche est déjà terminée.');
+      await tx.insert(workSessions).values({ userId: user.sub, seconds: body.seconds });
       const entry = JSON.stringify([{ label: t.title, when: 'Aujourd’hui', points: `+${POINTS_PER_TASK}` }]);
       const [l] = await tx.update(learner).set({
         points: sql`${learner.points} + ${POINTS_PER_TASK}`,

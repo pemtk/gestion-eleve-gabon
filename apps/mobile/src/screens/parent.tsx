@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import { formatGrade, formatInt } from '@sge/shared';
@@ -41,8 +41,21 @@ export function Home() {
 
 export function Activite() {
   const router = useRouter();
-  const { data: d, error } = useApi<{ kid: Kid; stats: { icon: string; value: string; label: string }[]; week: { day: string; minutes: number }[]; weekTotalLabel: string; reward: { label: string; threshold: number; points: number; left: number } | null; lastGrades: { subject: string; value: number }[] }>('/me/parent/children/k-aicha');
-  if (!d) return <Loading error={error} />;
+  const { kid } = useLocalSearchParams<{ kid?: string }>();
+  // Sans enfant choisi (onglet « Activité »), on prend le premier enfant rattaché.
+  const kids = useApi<Kid[]>('/me/parent/children');
+  const id = kid ?? kids.data?.[0]?.id ?? null;
+  const { data: d, error } = useApi<{ kid: { id: string; name: string; initials: string; className: string; school: string }; stats: { icon: string; value: string; label: string }[]; week: { day: string; minutes: number }[]; weekTotalLabel: string; reward: { label: string; threshold: number; points: number; left: number } | null; lastGrades: { subject: string; value: number }[] }>(id ? `/me/parent/children/${id}` : null);
+  if (kids.data && !kids.data.length) {
+    return (
+      <Screen gap={16}>
+        <H size={34}>Activité</H>
+        <B color={C.n[700]}>Aucun enfant n’est encore rattaché à votre compte.</B>
+        <Btn icon="qr-code" label="Ajouter un enfant" onPress={() => router.push('/parent/ajouter')} />
+      </Screen>
+    );
+  }
+  if (!d) return <Loading error={error ?? kids.error} />;
   const max = Math.max(...d.week.map((w) => w.minutes), 1);
   return (
     <Screen gap={18}>
@@ -53,13 +66,13 @@ export function Activite() {
       <View style={{ gap: 12 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}><H size={22} semi>Temps de travail</H><Muted size={12.5}>cette semaine · {d.weekTotalLabel}</Muted></View>
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, height: 110, borderBottomWidth: 1, borderBottomColor: C.divider }}>
-          {d.week.map((w, i) => <View key={i} style={{ flex: 1, alignItems: 'center' }}><View accessibilityLabel={`${w.day} : ${w.minutes} minutes`} style={{ width: '100%', maxWidth: 26, height: `${Math.round((w.minutes / max) * 100)}%`, minHeight: 2, backgroundColor: w.minutes > 60 ? C.a[300] : C.a[100], borderWidth: 1, borderColor: C.a[400], borderBottomWidth: 0, borderTopLeftRadius: 3, borderTopRightRadius: 3 }} /></View>)}
+          {d.week.map((w, i) => <View key={i} style={{ flex: 1, height: '100%', justifyContent: 'flex-end', alignItems: 'center' }}><View accessibilityLabel={`${w.day} : ${w.minutes} minutes`} style={{ width: '100%', maxWidth: 26, height: `${Math.round((w.minutes / max) * 100)}%`, minHeight: 2, backgroundColor: w.minutes > 60 ? C.a[300] : C.a[100], borderWidth: 1, borderColor: C.a[400], borderBottomWidth: 0, borderTopLeftRadius: 3, borderTopRightRadius: 3 }} /></View>)}
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>{d.week.map((w, i) => <Muted key={i} size={11.5} style={{ flex: 1, textAlign: 'center' }}>{w.day}</Muted>)}</View>
       </View>
       {d.reward && (
         <View style={{ gap: 8 }}>
-          <SectionTitle title="Récompense" action="Gérer les récompenses" onAction={() => router.push('/parent/recompenses')} />
+          <SectionTitle title="Récompense" action="Gérer les récompenses" onAction={() => router.push(`/parent/recompenses?kid=${d.kid.id}`)} />
           <Card tint style={{ gap: 10 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}><H size={21} italic>{d.reward.label}</H><B size={13} color={C.a[800]}>{formatInt(d.reward.points)} / {formatInt(d.reward.threshold)}</B></View>
             <Bar pct={(d.reward.points / d.reward.threshold) * 100} /><B size={13} color={C.a[800]}>Plus que {formatInt(d.reward.left)} points. Nous vous préviendrons.</B>
@@ -141,14 +154,15 @@ export function Ajouter() {
 }
 
 export function Recompenses() {
-  const { data, error, reload } = useApi<{ points: number; rewards: { id: string; label: string; threshold: number; reached: boolean; left: number }[] }>('/me/parent/rewards');
+  const { kid } = useLocalSearchParams<{ kid?: string }>();
+  const { data, error, reload } = useApi<{ child: string | null; points: number; rewards: { id: string; label: string; threshold: number; reached: boolean; left: number }[] }>(kid ? `/me/parent/rewards/${kid}` : '/me/parent/rewards');
   const [label, setLabel] = useState('');
   const [threshold, setThreshold] = useState<string | null>('2000');
   if (!data) return <Loading error={error} />;
   const add = async () => { await api.post('/me/parent/rewards', { label, threshold: Number(threshold) }); setLabel(''); void reload(); };
   return (
     <Screen gap={16}>
-      <Header title="Récompenses d’Aïcha" />
+      <Header title={data.child ? `Récompenses de ${data.child}` : 'Récompenses'} />
       <Card tint style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><B color={C.a[800]}>Points actuels</B><Num size={30} color={C.a[800]}>{formatInt(data.points)}</Num></Card>
       {data.rewards.map((r) => (
         <Card key={r.id} tint={r.reached} style={{ gap: 8 }}>

@@ -15,6 +15,12 @@ export const SCHOOL_NAME = 'Lycée Léon Mba';
 export const DEMO_SCHOOL_ID = 'o2';
 export const SECOND_SCHOOL_ID = 'o6';
 export const SECOND_SCHOOL_NAME = 'Collège Bessieux';
+/** École Saint-Michel : celle de Junior, le second enfant du parent de démonstration. */
+export const THIRD_SCHOOL_ID = 'o7';
+export const JUNIOR = {
+  klass: { id: 'sm-cm2', name: 'CM2', level: 'Primaire' as const, capacity: 35, students: 30, completion: 70 },
+  student: { id: 'sm-junior', firstName: 'Junior', lastName: 'Ondo', classId: 'sm-cm2', code: '340267' },
+};
 export const DEMO_PASSWORD = 'motdepasse1';
 
 export const DEMO_USERS: Record<Role, SessionUser> = {
@@ -138,16 +144,6 @@ export const POINTS_HISTORY = [
 export const STUDENT_START = { points: 1240, streak: 5, doneToday: 2, dailyGoal: 4 };
 
 /* ---- Parent ---- */
-export const KIDS = [
-  { id: 'k-aicha', name: 'Aïcha', initials: 'AO', className: '3ème B', school: SCHOOL_NAME, alert: false, status: 'Tout va bien. 2 tâches faites, 1 h 10 de travail.', icon: 'circle-check' },
-  { id: 'k-junior', name: 'Junior', initials: 'JO', className: 'CM2', school: 'École Saint-Michel', alert: true, status: 'Absent ce matin, de 8 h à 10 h.', icon: 'user-x' },
-];
-export const KID_STATS = [
-  { icon: 'list-checks', value: '2 / 4', label: 'tâches faites aujourd’hui' },
-  { icon: 'timer', value: '1 h 10', label: 'de travail aujourd’hui' },
-  { icon: 'flame', value: '5 j', label: 'de série' },
-  { icon: 'award', value: '1 240', label: 'points' },
-];
 export const WEEK_MINUTES = [
   { day: 'L', minutes: 55 }, { day: 'M', minutes: 70 }, { day: 'M', minutes: 40 },
   { day: 'J', minutes: 65 }, { day: 'V', minutes: 30 }, { day: 'S', minutes: 80 }, { day: 'D', minutes: 0 },

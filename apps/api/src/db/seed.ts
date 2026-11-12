@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
-  ABSENCES, ALERT_PREFS, DEMO_SCHOOL_ID, SECOND_SCHOOL_DATA, SECOND_SCHOOL_DIRECTOR, SECOND_SCHOOL_ID, AGENT_USERS, ASSIGNMENTS, CLASSES, CONFIDENTIAL_CASES, CONVERSATION, DEMO_PASSWORD, DEMO_USERS,
+  ABSENCES, ALERT_PREFS, DEMO_SCHOOL_ID, JUNIOR, THIRD_SCHOOL_ID, WEEK_MINUTES, SECOND_SCHOOL_DATA, SECOND_SCHOOL_DIRECTOR, SECOND_SCHOOL_ID, AGENT_USERS, ASSIGNMENTS, CLASSES, CONFIDENTIAL_CASES, CONVERSATION, DEMO_PASSWORD, DEMO_USERS,
   LINK_REQUESTS, ORGANIZATIONS, REWARDS, SCHOOL_YEAR, STUDENT_START, STUDENTS, SUBJECT_GRADES, TASKS, TEACHERS,
   TECH_INCIDENTS, THREADS, VISIT_REPORTS,
 } from '@sge/shared';
@@ -11,7 +11,7 @@ import * as t from './schema.js';
 const TABLES = [
   t.users, t.otpCodes, t.settings, t.classes, t.students, t.studentParents, t.teachers, t.linkRequests, t.schoolYears,
   t.assignments, t.absences, t.results, t.resultCorrections, t.announcements, t.cases, t.tasks, t.taskInvalidations,
-  t.learner, t.subjectGrades, t.rewards, t.alertPrefs, t.attendanceRecords, t.threads, t.messages, t.notificationReads,
+  t.learner, t.workSessions, t.subjectGrades, t.rewards, t.alertPrefs, t.attendanceRecords, t.threads, t.messages, t.notificationReads,
   t.organizations, t.orgSubscriptions, t.institutionalUsers, t.incidents, t.visitReports,
 ];
 
@@ -59,14 +59,15 @@ export async function seedDemo(db: Db, opts: { onlyIfEmpty?: boolean } = {}): Pr
 
     // 3. Lycée Léon Mba : l'établissement de démonstration complet.
     await tx.insert(t.classes).values(CLASSES.map((c) => ({ id: c.id, schoolId: S, name: c.name, level: c.level, capacity: c.capacity, studentCount: c.students, completion: c.completion, alert: c.alert ?? null })));
-    await tx.insert(t.students).values(STUDENTS.map((s) => ({ id: s.id, schoolId: S, firstName: s.firstName, lastName: s.lastName, classId: s.classId, phone: s.phone, code: s.code, activated: s.activated })));
-    const parents = STUDENTS.flatMap((s) => s.parents.map((p) => ({ studentId: s.id, name: p.name, relation: p.relation })));
+    await tx.insert(t.students).values(STUDENTS.map((s) => ({ id: s.id, schoolId: S, firstName: s.firstName, lastName: s.lastName, classId: s.classId, userId: s.id === 's1' ? STUDENT_ID : null, phone: s.phone, code: s.code, activated: s.activated })));
+    // Christelle Ondo (compte parent de démonstration) est la mère d'Aïcha ; Paul, son père, n'a pas d'application.
+    const parents = STUDENTS.flatMap((s) => s.parents.map((p) => ({ studentId: s.id, name: p.name, relation: p.relation, parentUserId: p.name === DEMO_USERS.parent.name ? PARENT_ID : null })));
     if (parents.length) await tx.insert(t.studentParents).values(parents);
     await tx.insert(t.teachers).values(TEACHERS.map((x) => ({ ...x, schoolId: S })));
     await tx.insert(t.linkRequests).values(LINK_REQUESTS.map((r) => ({ id: r.id, schoolId: S, parent: r.parent, relation: r.relation, child: r.child, meta: r.meta })));
     await tx.insert(t.schoolYears).values({ schoolId: S, label: SCHOOL_YEAR.label, start: SCHOOL_YEAR.start, end: SCHOOL_YEAR.end, active: SCHOOL_YEAR.active, terms: SCHOOL_YEAR.terms });
     await tx.insert(t.assignments).values(ASSIGNMENTS.map((a) => ({ ...a, schoolId: S })));
-    await tx.insert(t.absences).values(ABSENCES.map((a) => ({ ...a, schoolId: S })));
+    await tx.insert(t.absences).values(ABSENCES.map((a) => ({ ...a, schoolId: a.student === 'Junior Ondo' ? THIRD_SCHOOL_ID : S })));
     await tx.insert(t.results).values(RESULT_ROWS.map(([student, value], i) => ({ id: `res${i}`, schoolId: S, student, value, coefficient: 2, published: value !== null })));
     await tx.insert(t.cases).values(CONFIDENTIAL_CASES.map((c) => ({ id: c.id, schoolId: S, reporter: c.reporter, className: c.className, type: c.type, received: c.received, student: c.student, text: c.text })));
     await tx.insert(t.tasks).values(TASKS.map((k) => ({ id: k.id, schoolId: S, title: k.title, subject: k.subject, type: k.type, due: k.due, status: k.status, estimate: k.estimate })));
@@ -93,6 +94,15 @@ export async function seedDemo(db: Db, opts: { onlyIfEmpty?: boolean } = {}): Pr
     await tx.insert(t.announcements).values({ ...D.announcement, schoolId: B });
     await tx.insert(t.schoolYears).values({ schoolId: B, label: SCHOOL_YEAR.label, start: SCHOOL_YEAR.start, end: SCHOOL_YEAR.end, active: true, terms: SCHOOL_YEAR.terms });
     await tx.insert(t.cases).values({ id: D.case.id, schoolId: B, reporter: D.case.reporter, className: D.case.className, type: D.case.type, received: D.case.received, student: D.case.student, text: D.case.text });
+
+    // 4 bis. École Saint-Michel : Junior, second enfant du parent de démonstration (autre établissement).
+    await tx.insert(t.classes).values({ id: JUNIOR.klass.id, schoolId: THIRD_SCHOOL_ID, name: JUNIOR.klass.name, level: JUNIOR.klass.level, capacity: JUNIOR.klass.capacity, studentCount: JUNIOR.klass.students, completion: JUNIOR.klass.completion });
+    await tx.insert(t.students).values({ ...JUNIOR.student, schoolId: THIRD_SCHOOL_ID, phone: null, activated: false });
+    await tx.insert(t.studentParents).values({ studentId: JUNIOR.student.id, name: DEMO_USERS.parent.name, relation: 'mère', parentUserId: PARENT_ID });
+
+    // Temps de travail d'Aïcha sur les 7 derniers jours (une séance par jour).
+    const day = 86_400_000;
+    await tx.insert(t.workSessions).values(WEEK_MINUTES.map((w, i) => ({ userId: STUDENT_ID, seconds: w.minutes * 60, at: new Date(Date.now() - (6 - i) * day) })).filter((x) => x.seconds > 0));
 
     // 5. Administration et supervision (hors établissement).
     await tx.insert(t.institutionalUsers).values(AGENT_USERS.map((u) => ({ name: u.name, role: u.role, scope: u.scope, status: u.status })));

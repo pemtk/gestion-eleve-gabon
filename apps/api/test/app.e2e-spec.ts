@@ -64,13 +64,12 @@ describe('API (e2e, PostgreSQL)', () => {
     expect(res.body.value).toBe(16);
   });
 
-  it('rattache un enfant par code et envoie les codes déjà utilisés en validation', async () => {
+  it('rattache un enfant par code ; un enfant déjà rattaché ne l’est pas deux fois', async () => {
     const parent = await token_('parent');
     await api_().post('/me/parent/children/link').set(as_(parent)).send({ mode: 'code', code: '000000', relation: 'mère' }).expect(404);
     const active = await api_().post('/me/parent/children/link').set(as_(parent)).send({ mode: 'code', code: '219530', relation: 'mère' }).expect(201);
     expect(active.body.status).toBe('active');
-    const pending = await api_().post('/me/parent/children/link').set(as_(parent)).send({ mode: 'code', code: '482917', relation: 'tuteur' }).expect(201);
-    expect(pending.body.status).toBe('pending');
+    await api_().post('/me/parent/children/link').set(as_(parent)).send({ mode: 'code', code: '482917', relation: 'mère' }).expect(409); // Aïcha : déjà la sienne
   });
 
   it('masque les petites cellules pour le partenaire', async () => {

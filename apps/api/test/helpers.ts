@@ -26,3 +26,13 @@ export function client(app: INestApplication<App>) {
   const as = (t: string) => ({ Authorization: `Bearer ${t}` });
   return { api, token, as };
 }
+
+/** Crée un compte (activé, mot de passe de démonstration) rattaché à un établissement et retourne son jeton. */
+export async function createUser(app: INestApplication<App>, u: { id: string; phone: string; role: Role; schoolId: string | null; name?: string }) {
+  const { users } = await import('../src/db/schema.js');
+  const { hashPassword } = await import('../src/auth/password.js');
+  const { DEMO_PASSWORD } = await import('@sge/shared');
+  await dbOf(app).insert(users).values({ id: u.id, phone: u.phone, name: u.name ?? 'Compte test', initials: 'CT', role: u.role, title: u.role, passwordHash: hashPassword(DEMO_PASSWORD), activated: true, schoolId: u.schoolId });
+  const res = await request(app.getHttpServer()).post('/auth/login').send({ mode: 'password', phone: u.phone, password: DEMO_PASSWORD }).expect(201);
+  return res.body.accessToken as string;
+}

@@ -32,7 +32,7 @@ describe('Isolation entre établissements', () => {
     expect((await get('/school/profile', b).expect(200)).body.name).toBe('Collège Bessieux');
 
     // pastilles de la barre latérale propres à chaque école
-    expect((await get('/school/profile', a)).body.badges).toEqual({ users: 3, absences: 2, cases: 3 });
+    expect((await get('/school/profile', a)).body.badges).toEqual({ users: 3, absences: 1, cases: 3 });
     expect((await get('/school/profile', b)).body.badges).toEqual({ users: 0, absences: 1, cases: 1 });
 
     const studentsA = (await get('/school/students', a).expect(200)).body.map((s: { id: string }) => s.id);

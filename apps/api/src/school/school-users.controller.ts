@@ -1,5 +1,5 @@
 import { Body, ConflictException, Controller, Get, Inject, NotFoundException, Param, Post } from '@nestjs/common';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { formatCode, initials, inviteSchema, newStudentSchema, parseStudentCsv } from '@sge/shared';
 import { randomInt, randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -135,8 +135,14 @@ export class SchoolUsersController {
     const sid = schoolOf(user);
     await this.policy.assertWritable(sid);
     if (!['accept', 'refuse'].includes(decision)) throw new NotFoundException();
-    const [r] = await this.db.update(linkRequests).set({ decision: decision === 'accept' ? 'ok' : 'no' }).where(and(eq(linkRequests.id, id), eq(linkRequests.schoolId, sid))).returning();
-    if (!r) throw new NotFoundException();
-    return r;
+    return this.db.transaction(async (tx) => {
+      const [r] = await tx.update(linkRequests).set({ decision: decision === 'accept' ? 'ok' : 'no' }).where(and(eq(linkRequests.id, id), eq(linkRequests.schoolId, sid), isNull(linkRequests.decision))).returning();
+      if (!r) throw new NotFoundException();
+      // Validation : le parent voit désormais l'enfant dans son application (la limite de 2 parents est levée par l'école).
+      if (decision === 'accept' && r.studentId && r.parentUserId) {
+        await tx.insert(studentParents).values({ studentId: r.studentId, name: r.parent, relation: r.relation, parentUserId: r.parentUserId }).onConflictDoNothing();
+      }
+      return r;
+    });
   }
 }

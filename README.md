@@ -78,6 +78,10 @@ Plusieurs écoles partagent la même base ; chacune ne voit et ne modifie que se
   composite `students (class_id, school_id) → classes (id, school_id)` (un élève ne peut pas être rattaché à la classe d'une autre école).
 - Par école : abonnement et formule (`org_subscriptions`), référent vie scolaire (`settings`), année scolaire, classes
   (nom unique **par école**), élèves, enseignants, absences, notes, annonces, signalements, tâches, conversations.
+- **Parents et enfants** : un parent voit les enfants rattachés à son compte (`student_parents.parent_user_id`), même dans
+  plusieurs écoles. Un code valide rattache tout de suite ; un code déjà utilisé deux fois crée une demande que l'école
+  valide (la validation crée le rattachement). Le temps de travail vient des séances chronométrées enregistrées à chaque
+  tâche terminée (`work_sessions`).
 - Par utilisateur : points et série, préférences d'alerte, récompenses, notifications lues, visibilité de la photo.
 - **L'agent** ne voit que les écoles de son périmètre (`user_scopes`). Les codes parents sont uniques sur toute la plateforme.
 - Le jeu de démonstration contient **deux écoles** : Lycée Léon Mba (profils de démo) et Collège Bessieux
@@ -116,8 +120,7 @@ Production : `JWT_SECRET` (API) et `SESSION_SECRET` (web) sont **obligatoires** 
 
 - **Indicateurs** : les tableaux de bord (taux, volumes) affichent les valeurs du jeu de démonstration ; leur calcul
   à partir des données réelles (activité, présences…) reste à écrire.
-- **Parent et enfants** : l'accueil du parent affiche les enfants du jeu de démonstration ; le rattachement par code
-  est enregistré en base mais n'alimente pas encore cette liste. Les tâches sont communes à une école (pas encore par classe).
+- **Tâches** : elles sont communes à une école (pas encore par classe ni par élève).
 - **Défense en profondeur** : le cloisonnement est appliqué par l'application et par des contraintes ; PostgreSQL
   *Row Level Security* (politiques sur `school_id`) pourrait s'y ajouter pour qu'un oubli de filtre soit sans effet.
 - **SMS** : `SmsGateway` journalise les messages ; brancher l'opérateur SMS (OTP, alertes, invitations).

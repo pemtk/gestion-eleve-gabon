@@ -51,6 +51,8 @@ export const students = pgTable('students', {
   firstName: text('first_name').notNull(),
   lastName: text('last_name').notNull(),
   classId: text('class_id').notNull(),
+  /** Compte de l'élève, une fois activé (ses points et son temps de travail y sont rattachés). */
+  userId: text('user_id').references(() => users.id).unique(),
   phone: text('phone'),
   /** Code d'invitation parent (6 chiffres). */
   code: text('code').notNull().unique(),
@@ -67,7 +69,10 @@ export const studentParents = pgTable('student_parents', {
   studentId: text('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   relation: text('relation').notNull(),
-});
+  /** Compte du parent ; null tant que ce parent n'a pas d'application. */
+  parentUserId: text('parent_user_id').references(() => users.id, { onDelete: 'cascade' }),
+}, (t) => [uniqueIndex('student_parents_student_user_uq').on(t.studentId, t.parentUserId)]);
+
 
 export const teachers = pgTable('teachers', {
   schoolId: text('school_id').notNull().references(() => organizations.id),
@@ -85,6 +90,9 @@ export const linkRequests = pgTable('link_requests', {
   relation: text('relation').notNull(),
   child: text('child').notNull(),
   meta: text('meta').notNull(),
+  /** Élève et compte parent concernés : à la validation par l'école, le rattachement est créé. */
+  studentId: text('student_id'),
+  parentUserId: text('parent_user_id'),
   decision: text('decision'),
 });
 
@@ -193,6 +201,14 @@ export const learner = pgTable('learner', {
   doneToday: integer('done_today').notNull(),
   history: jsonb('history').$type<{ label: string; when: string; points: string }[]>().notNull().default([]),
 });
+
+/** Temps de travail réel d'un élève (secondes chronométrées sur une tâche terminée). */
+export const workSessions = pgTable('work_sessions', {
+  id: serial('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  seconds: integer('seconds').notNull(),
+  at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('work_sessions_user_idx').on(t.userId, t.at)]);
 
 export const subjectGrades = pgTable('subject_grades', {
   id: serial('id').primaryKey(),
