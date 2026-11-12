@@ -56,10 +56,7 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
       <div className="hidden flex-col justify-between border-r border-divider bg-neutral-100 p-12 lg:flex">
-        <div className="flex items-center gap-3">
-          <div className="grid h-[52px] w-[52px] place-items-center rounded-full border-[1.5px] border-accent font-heading text-[22px] italic text-accent-700">Sg</div>
-          <div className="font-heading text-[17px] leading-tight font-semibold">Suivi et Gestion<br />des Élèves</div>
-        </div>
+        <img src="/logo.png" alt="Gestion Élève Gabon" width={168} height={168} className="h-[168px] w-[168px]" />
         <div>
           <Kicker>Plateforme multiprofil · Gabon</Kicker>
           <h1 className="mt-3 text-[64px] leading-[1.02] font-normal">Piloter l’école,<br /><span className="italic">sans papier.</span></h1>

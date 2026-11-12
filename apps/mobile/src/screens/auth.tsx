@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { Image, Pressable, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { isPasswordValid, normalizePhone, passwordRules, ROLE_LABELS, MOBILE_ROLES, type Role, type SessionUser } from '@sge/shared';
 import { Icon } from '@/components/icon';
@@ -26,12 +26,7 @@ function useFinish() {
 }
 
 const Brand = () => (
-  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-    <View style={{ width: 52, height: 52, borderRadius: 26, borderWidth: 1.5, borderColor: C.accent, alignItems: 'center', justifyContent: 'center' }}>
-      <H size={22} italic color={C.a[700]}>Sg</H>
-    </View>
-    <H size={17} semi style={{ lineHeight: 19 }}>{'Suivi et Gestion\ndes Élèves'}</H>
-  </View>
+  <Image source={require('../../assets/images/logo.png')} accessibilityLabel="Gestion Élève Gabon" style={{ width: 150, height: 150, alignSelf: 'center' }} resizeMode="contain" />
 );
 const Phone = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
   <View style={{ gap: 7 }}>

@@ -79,4 +79,4 @@ Production : `JWT_SECRET` (API) et `SESSION_SECRET` (web) sont **obligatoires** 
 - **Fichiers** : photos de preuve, pièces jointes et images de messagerie sont des indicateurs, sans stockage.
 - **QR code** : l'écran « scanner » du parent est une maquette ; la saisie du code à 6 chiffres est fonctionnelle.
 - **Notifications push** : l'interrupteur est en place, l'envoi (Expo Push) reste à brancher.
-- **Logo** : à ajouter (marque « Sg » provisoire) — voir `apps/web/app/components/shell.tsx` et `apps/mobile/src/screens/auth.tsx`.
+

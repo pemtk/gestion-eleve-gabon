@@ -28,8 +28,8 @@ export function Shell({ user, nav, school, space, banner }: ShellProps) {
 
   return (
     <div className="grid min-h-screen lg:grid-cols-[236px_minmax(0,1fr)]">
-      <div className="flex items-center justify-between border-b border-divider bg-neutral-100 px-4 py-3 lg:hidden">
-        <Brand />
+      <div className="flex items-center justify-between border-b border-divider bg-neutral-100 px-4 py-2 lg:hidden">
+        <Brand size="sm" />
         <button type="button" aria-expanded={open} aria-controls="sidebar" aria-label="Menu" onClick={() => setOpen((o) => !o)} className="grid h-10 w-10 place-items-center rounded-md border border-divider">
           <Icon name={open ? 'x' : 'menu'} size={20} />
         </button>
@@ -92,11 +92,6 @@ export function Shell({ user, nav, school, space, banner }: ShellProps) {
   );
 }
 
-function Brand() {
-  return (
-    <div className="flex items-center gap-2.5">
-      <div className="grid h-[38px] w-[38px] flex-none place-items-center rounded-full border-[1.5px] border-accent font-heading text-[17px] italic text-accent-700">Sg</div>
-      <div className="font-heading text-[15px] leading-tight font-semibold">Suivi et Gestion des Élèves</div>
-    </div>
-  );
+function Brand({ size = 'md' }: { size?: 'sm' | 'md' }) {
+  return <img src="/logo.png" alt="Gestion Élève Gabon" width={size === 'sm' ? 56 : 132} height={size === 'sm' ? 56 : 132} className={size === 'sm' ? 'h-14 w-14' : 'mx-auto h-[132px] w-[132px]'} />;
 }
