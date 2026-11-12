@@ -34,13 +34,15 @@ const walk = (dir) => {
 walk(join(root, cfg.src));
 walk(join(root, 'packages/shared/src'));
 
+// Exports de lucide qui ne sont pas des icônes (le mot « icon » apparaît dans le code, ex. rel: 'icon').
+const NOT_ICONS = new Set(['Icon', 'Icons', 'LucideProvider', 'DynamicIcon']);
 const pascal = (k) => k.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join('');
 const found = new Map();
 for (const file of files) {
   for (const m of readFileSync(file, 'utf8').matchAll(/['"`]([a-z][a-z0-9]*(?:-[a-z0-9]+)*)['"`]/g)) {
     const name = m[1];
     const comp = pascal(name);
-    if (!found.has(name) && lucide[comp] && typeof lucide[comp] !== 'string') found.set(name, comp);
+    if (!found.has(name) && !NOT_ICONS.has(comp) && lucide[comp] && typeof lucide[comp] !== 'string') found.set(name, comp);
   }
 }
 
