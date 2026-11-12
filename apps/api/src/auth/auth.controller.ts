@@ -1,6 +1,6 @@
 import { Body, Controller, Get, NotFoundException, Param, Post } from '@nestjs/common';
 import {
-  forgotSchema, loginSchema, otpVerifySchema, passwordChangeSchema, passwordSchema, phoneSchema,
+  forgotSchema, loginSchema, otpVerifySchema, passwordChangeSchema, passwordSchema, passwordSetSchema, phoneSchema,
   ROLES, signupSchema, type Role,
 } from '@sge/shared';
 import { z } from 'zod';
@@ -20,7 +20,7 @@ export class AuthController {
 
   @Public() @Post('otp/request')
   requestOtp(@Body({ schema: z.object({ phone: phoneSchema }) }) body: { phone: string }) {
-    return this.auth.requestOtp(body.phone);
+    return this.auth.requestOtpIfAccount(body.phone);
   }
 
   @Public() @Post('otp/verify')
@@ -48,9 +48,15 @@ export class AuthController {
     return this.auth.changePassword(user.phone, body.current, body.next);
   }
 
+  /** Premier mot de passe d'un compte qui n'en a pas (activé par code SMS). */
+  @Post('password/set')
+  set(@CurrentUser() user: AuthUser, @Body({ schema: passwordSetSchema }) body: z.infer<typeof passwordSetSchema>) {
+    return this.auth.setPassword(user.phone, body.next);
+  }
+
   @Get('me')
-  me(@CurrentUser() user: AuthUser) {
-    return this.auth.me(user.phone);
+  async me(@CurrentUser() user: AuthUser) {
+    return { ...(await this.auth.me(user.phone)), hasPassword: await this.auth.hasPassword(user.phone) };
   }
 
   @Public() @Post('demo/:role')

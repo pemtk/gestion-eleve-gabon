@@ -22,6 +22,9 @@ services:
       # Charge les comptes de démonstration (mot de passe motdepasse1) dans une base vide.
       # À mettre à false pour tout environnement réel.
       SEED_DEMO: ${SEED_DEMO:-true}
+      # Sans démo : crée le premier administrateur au démarrage (voir README « Comptes »).
+      BOOTSTRAP_ADMIN_PHONE: ${BOOTSTRAP_ADMIN_PHONE:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
     ports: ['3000:3000']
     depends_on:
       db: { condition: service_healthy }

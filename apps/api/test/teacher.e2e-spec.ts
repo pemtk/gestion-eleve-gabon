@@ -1,8 +1,8 @@
 import type { INestApplication } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import type { App } from 'supertest/types.js';
-import { DEMO_SCHOOL_ID } from '@sge/shared';
-import { settings, students } from '../src/db/schema.js';
+import { DEMO_PASSWORD, DEMO_SCHOOL_ID } from '@sge/shared';
+import { settings } from '../src/db/schema.js';
 import { client, createApp, createUser, dbOf, reset } from './helpers.js';
 
 type Row = { studentId: string; name: string; status: string; time?: string; evaluation?: string; justification?: string | null };
@@ -18,11 +18,11 @@ describe('Espace enseignant (PostgreSQL)', () => {
   beforeEach(async () => { await reset(app); prof = await c.token('enseignant'); direction = await c.token('etablissement'); });
   const get = (path: string, t: string) => c.api().get(path).set(c.as(t));
   const post = (path: string, t: string, body?: object) => c.api().post(path).set(c.as(t)).send(body);
-  /** Relie un compte élève à une fiche d'élève existante et retourne son jeton. */
+  /** Jeton du compte de l'élève (créé avec sa fiche par le jeu de démonstration, comme le ferait l'école). */
   const studentAccount = async (studentId: string, phone: string) => {
-    const t = await createUser(app, { id: `u-${studentId}`, phone, role: 'eleve', schoolId: DEMO_SCHOOL_ID });
-    await dbOf(app).update(students).set({ userId: `u-${studentId}` }).where(eq(students.id, studentId));
-    return t;
+    const res = await c.api().post('/auth/login').send({ mode: 'password', phone, password: DEMO_PASSWORD }).expect(201);
+    expect(res.body.user.id).toBe(`u-${studentId}`);
+    return res.body.accessToken as string;
   };
 
   it('l’enseignant ne voit que les classes de ses affectations', async () => {
@@ -38,7 +38,7 @@ describe('Espace enseignant (PostgreSQL)', () => {
   describe('tâches par classe et par élève (#16)', () => {
     it('une tâche n’est visible que des élèves de sa classe', async () => {
       const aicha = await c.token('eleve'); // 3ème B
-      const brice = await studentAccount('s2', '06000002'); // 4ème A
+      const brice = await studentAccount('s2', '07123000'); // 4ème A
       const created = await post('/me/teacher/tasks', prof, { classId: '4a', subject: 'Mathématiques', type: 'Exercice', title: 'Équations', description: 'Exercices 1 à 5', due: 'Demain' }).expect(201);
       expect(created.body.notified).toEqual({ students: 2, parents: 2 });
       const ids = async (t: string) => (await get('/me/student/tasks', t).expect(200)).body.tasks.map((x: { id: string }) => x.id);
@@ -57,7 +57,7 @@ describe('Espace enseignant (PostgreSQL)', () => {
 
     it('l’avancement est propre à chaque élève', async () => {
       const aicha = await c.token('eleve');
-      const oceane = await studentAccount('s12', '06000012'); // k1 : pas commencée
+      const oceane = await studentAccount('s12', '06998811'); // k1 : pas commencée
       const status = async (t: string) => (await get('/me/student/tasks/k1', t).expect(200)).body.status;
       expect(await status(aicha)).toBe('todo');
       expect(await status(oceane)).toBe('todo');
@@ -73,7 +73,7 @@ describe('Espace enseignant (PostgreSQL)', () => {
       expect(by).toMatchObject({ 'Aïcha Ondo': 'none', 'Cyrielle Mba': 'done', 'Mariam Ondimba': 'doing', 'Océane Ndzengue': 'none', 'Patrick Obame': 'done' });
       expect(body.rows).toHaveLength(8);
       expect(body.doubts).toBe(2);
-      const oceane = await studentAccount('s12', '06000012');
+      const oceane = await studentAccount('s12', '06998811');
       await post('/me/student/tasks/k1/complete', oceane, { evaluation: 'doubt', seconds: 900 }).expect(201);
       const after = (await get('/me/teacher/tasks/k1/follow-up', prof)).body;
       expect(after.rows.find((r: Row) => r.name === 'Océane Ndzengue')).toMatchObject({ status: 'done', evaluation: 'doubt', time: '15 min' });
@@ -81,7 +81,7 @@ describe('Espace enseignant (PostgreSQL)', () => {
     });
 
     it('invalider renvoie la tâche à l’élève et annule ses points', async () => {
-      const oceane = await studentAccount('s12', '06000012');
+      const oceane = await studentAccount('s12', '06998811');
       await post('/me/student/tasks/k1/complete', oceane, { evaluation: 'ok', seconds: 900 }).expect(201);
       expect((await get('/me/student/trophies', oceane)).body.points).toBe(20);
       await post('/me/teacher/tasks/k1/invalidate/s12', prof).expect(201);

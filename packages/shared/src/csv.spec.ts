@@ -35,3 +35,12 @@ describe('validateStudentRow / buildStudentCsv', () => {
     expect(parseStudentCsv(csv, classes).rows[0]?.error).toBeUndefined();
   });
 });
+
+describe('numéros en double', () => {
+  it('refuse un numéro déjà présent plus haut dans le fichier (un numéro = un compte)', () => {
+    const csv = ['nom,prénom,téléphone,classe', 'A,Un,+241 07 11 22 33,3ème B', 'B,Deux,07 11 22 33,3ème B', 'C,Trois,07 99 88 77,4ème A'].join('\n');
+    const { rows } = parseStudentCsv(csv, classes);
+    expect(rows.map((r) => r.error)).toEqual([undefined, 'Numéro en double dans le fichier', undefined]);
+  });
+});
+

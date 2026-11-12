@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { StandardSchemaValidationPipe } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import { AccountsService } from './accounts/accounts.service.js';
 import { AdminController } from './admin/admin.controller.js';
 import { AgentController } from './agent/agent.controller.js';
 import { AuthController } from './auth/auth.controller.js';
@@ -42,7 +43,7 @@ export function jwtSecret(): string {
     AgentController, PartnerController, AdminController,
   ],
   providers: [
-    AuthService, SmsGateway, CasesService, SchoolPolicy, PartnerService,
+    AuthService, SmsGateway, AccountsService, CasesService, SchoolPolicy, PartnerService,
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_PIPE, useValue: new StandardSchemaValidationPipe() },

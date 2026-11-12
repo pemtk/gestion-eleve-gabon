@@ -9,7 +9,8 @@ export const users = pgTable('users', {
   role: text('role').notNull(),
   title: text('title').notNull().default(''),
   organization: text('organization'),
-  passwordHash: text('password_hash').notNull(),
+  /** Null tant que le titulaire n'a pas défini de mot de passe (compte créé par l'école, activé par code SMS). */
+  passwordHash: text('password_hash'),
   activated: boolean('activated').notNull().default(false),
   /** Établissement de rattachement (null pour agent, partenaire et administrateur : profils multi-établissements). */
   schoolId: text('school_id').references(() => organizations.id),
@@ -357,6 +358,8 @@ export const userScopes = pgTable('user_scopes', {
 
 export const institutionalUsers = pgTable('institutional_users', {
   id: serial('id').primaryKey(),
+  /** Compte de l'agent ou du partenaire ; null pour les lignes historiques sans compte. */
+  userId: text('user_id').references(() => users.id, { onDelete: 'set null' }).unique(),
   name: text('name').notNull(),
   role: text('role').notNull(),
   scope: text('scope').notNull(),

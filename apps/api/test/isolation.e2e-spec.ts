@@ -96,7 +96,7 @@ describe('Isolation entre établissements', () => {
     const admin = await c.token('admin');
     // B est en formule Essentiel : pas d'invitation SMS ; A (Standard) oui
     expect((await post('/school/teachers/invite', b, { name: 'Test B', phone: '07 00 00 01' }).expect(403)).body.code).toBe('PLAN_REQUIRED');
-    await post('/school/teachers/invite', a, { name: 'Test A', phone: '07 00 00 02' }).expect(201);
+    await post('/school/teachers/invite', a, { name: 'Test A', phone: '07 55 44 33' }).expect(201);
     expect((await get('/dashboard/ecole', b).expect(200)).body.statsLocked).toBe(true);
     expect((await get('/dashboard/ecole', a).expect(200)).body.statsLocked).toBe(false);
 

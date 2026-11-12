@@ -4,6 +4,7 @@ import {
   LINK_REQUESTS, ORGANIZATIONS, REWARDS, SCHOOL_YEAR, STUDENT_START, STUDENTS, SUBJECT_GRADES, TASKS, TEACHERS,
   TECH_INCIDENTS, THREADS, VISIT_REPORTS,
 } from '@sge/shared';
+import { initials, normalizePhone } from '@sge/shared';
 import { hashPassword } from '../auth/password.js';
 import type { Db } from './db.module.js';
 import * as t from './schema.js';
@@ -57,17 +58,36 @@ export async function seedDemo(db: Db, opts: { onlyIfEmpty?: boolean } = {}): Pr
       id: u.id, phone: u.phone, name: u.name, initials: u.initials, role: u.role, title: u.title, organization: u.organization ?? null,
       passwordHash: hash, activated: true, schoolId: u.id === SECOND_SCHOOL_DIRECTOR.id ? SECOND_SCHOOL_ID : schoolRoles.has(u.role) ? S : null,
     })));
+    // Élèves et enseignants : chacun a un vrai compte (activé, mot de passe de démonstration), sauf celui d'un enseignant
+    // dont l'invitation n'est pas encore activée (Rachel Nziengui : compte sans mot de passe) et ceux qui n'ont pas de téléphone.
+    const knownIds = new Set(accounts.map((u) => u.id));
+    const studentAccounts = [...STUDENTS.map((st) => ({ st, school: S })), ...SECOND_SCHOOL_DATA.students.map((st) => ({ st, school: SECOND_SCHOOL_ID }))]
+      .filter(({ st }) => st.phone)
+      .map(({ st, school }) => ({ id: st.id === 's1' ? STUDENT_ID : `u-${st.id}`, school, st }))
+      .filter((a) => !knownIds.has(a.id));
+    if (studentAccounts.length) {
+      await tx.insert(t.users).values(studentAccounts.map(({ id, school, st }) => ({
+        id, phone: normalizePhone(st.phone!), name: `${st.firstName} ${st.lastName}`, initials: initials(`${st.firstName} ${st.lastName}`),
+        role: 'eleve', title: 'Élève', organization: null, passwordHash: hash, activated: true, schoolId: school,
+      })));
+    }
+    const teacherAccounts = [...TEACHERS.map((x) => ({ ...x, school: S })), { ...SECOND_SCHOOL_DATA.teacher, school: SECOND_SCHOOL_ID }]
+      .filter((x) => x.status !== 'Invitation expirée' && !knownIds.has(x.id === 't1' ? DEMO_USERS.enseignant.id : `u-${x.id}`) && x.id !== 't1');
+    await tx.insert(t.users).values(teacherAccounts.map((x) => ({
+      id: `u-${x.id}`, phone: normalizePhone(x.phone), name: x.name, initials: initials(x.name), role: 'enseignant', title: 'Enseignant', organization: null,
+      passwordHash: x.status === 'Activé' ? hash : null, activated: x.status === 'Activé', schoolId: x.school,
+    })));
     // Périmètre de l'agent : les six écoles de son tableau de bord.
     const agentScope = ['Lycée Léon Mba', 'Collège Bessieux', 'École Saint-Michel', 'Lycée d’Owendo', 'Collège de Nzeng-Ayong', 'École Akébé-Plaine'];
     await tx.insert(t.userScopes).values(ORGANIZATIONS.filter((o) => agentScope.includes(o.name)).map((o) => ({ userId: DEMO_USERS.agent.id, orgId: o.id })));
 
     // 3. Lycée Léon Mba : l'établissement de démonstration complet.
     await tx.insert(t.classes).values(CLASSES.map((c) => ({ id: c.id, schoolId: S, name: c.name, level: c.level, capacity: c.capacity, studentCount: c.students, completion: c.completion, alert: c.alert ?? null })));
-    await tx.insert(t.students).values(STUDENTS.map((s) => ({ id: s.id, schoolId: S, firstName: s.firstName, lastName: s.lastName, classId: s.classId, userId: s.id === 's1' ? STUDENT_ID : null, phone: s.phone, code: s.code, activated: s.activated })));
+    await tx.insert(t.students).values(STUDENTS.map((s) => ({ id: s.id, schoolId: S, firstName: s.firstName, lastName: s.lastName, classId: s.classId, userId: s.phone ? (s.id === 's1' ? STUDENT_ID : `u-${s.id}`) : null, phone: s.phone, code: s.code, activated: s.activated })));
     // Christelle Ondo (compte parent de démonstration) est la mère d'Aïcha ; Paul, son père, n'a pas d'application.
     const parents = STUDENTS.flatMap((s) => s.parents.map((p) => ({ studentId: s.id, name: p.name, relation: p.relation, parentUserId: p.name === DEMO_USERS.parent.name ? PARENT_ID : null })));
     if (parents.length) await tx.insert(t.studentParents).values(parents);
-    await tx.insert(t.teachers).values(TEACHERS.map((x) => ({ id: x.id, name: x.name, phone: x.phone, status: x.status, schoolId: S, userId: x.id === 't1' ? DEMO_USERS.enseignant.id : null })));
+    await tx.insert(t.teachers).values(TEACHERS.map((x) => ({ id: x.id, name: x.name, phone: x.phone, status: x.status, schoolId: S, userId: x.id === 't1' ? DEMO_USERS.enseignant.id : x.status === 'Invitation expirée' ? null : `u-${x.id}` })));
     await tx.insert(t.linkRequests).values(LINK_REQUESTS.map((r) => ({ id: r.id, schoolId: S, parent: r.parent, relation: r.relation, child: r.child, meta: r.meta })));
     await tx.insert(t.schoolYears).values({ schoolId: S, label: SCHOOL_YEAR.label, start: SCHOOL_YEAR.start, end: SCHOOL_YEAR.end, active: SCHOOL_YEAR.active, terms: SCHOOL_YEAR.terms });
     await tx.insert(t.assignments).values(ASSIGNMENTS.map((a) => ({ ...a, schoolId: S })));
@@ -115,9 +135,9 @@ export async function seedDemo(db: Db, opts: { onlyIfEmpty?: boolean } = {}): Pr
     // 4. Collège Bessieux : un second établissement, distinct, pour montrer et tester le cloisonnement.
     const B = SECOND_SCHOOL_ID; const D = SECOND_SCHOOL_DATA;
     await tx.insert(t.classes).values(D.classes.map((c) => ({ id: c.id, schoolId: B, name: c.name, level: c.level, capacity: c.capacity, studentCount: c.students, completion: c.completion })));
-    await tx.insert(t.students).values(D.students.map((s) => ({ id: s.id, schoolId: B, firstName: s.firstName, lastName: s.lastName, classId: s.classId, phone: s.phone, code: s.code, activated: true })));
+    await tx.insert(t.students).values(D.students.map((s) => ({ id: s.id, schoolId: B, firstName: s.firstName, lastName: s.lastName, classId: s.classId, userId: `u-${s.id}`, phone: s.phone, code: s.code, activated: true })));
     await tx.insert(t.studentParents).values(D.students.flatMap((s) => s.parents.map(([name, relation]) => ({ studentId: s.id, name, relation }))));
-    await tx.insert(t.teachers).values({ id: D.teacher.id, name: D.teacher.name, phone: D.teacher.phone, status: D.teacher.status, schoolId: B });
+    await tx.insert(t.teachers).values({ id: D.teacher.id, name: D.teacher.name, phone: D.teacher.phone, status: D.teacher.status, schoolId: B, userId: `u-${D.teacher.id}` });
     await tx.insert(t.attendanceRecords).values({ ...D.absence, schoolId: B });
     await tx.insert(t.announcements).values({ ...D.announcement, schoolId: B });
     await tx.insert(t.schoolYears).values({ schoolId: B, label: SCHOOL_YEAR.label, start: SCHOOL_YEAR.start, end: SCHOOL_YEAR.end, active: true, terms: SCHOOL_YEAR.terms });
@@ -136,7 +156,7 @@ export async function seedDemo(db: Db, opts: { onlyIfEmpty?: boolean } = {}): Pr
     await tx.insert(t.workSessions).values(WEEK_MINUTES.map((w, i) => ({ userId: STUDENT_ID, seconds: w.minutes * 60, at: new Date(Date.now() - (6 - i) * day) })).filter((x) => x.seconds > 0));
 
     // 5. Administration et supervision (hors établissement).
-    await tx.insert(t.institutionalUsers).values(AGENT_USERS.map((u) => ({ name: u.name, role: u.role, scope: u.scope, status: u.status })));
+    await tx.insert(t.institutionalUsers).values(AGENT_USERS.map((u) => ({ userId: u.name === DEMO_USERS.agent.name ? DEMO_USERS.agent.id : u.name === DEMO_USERS.partenaire.name ? DEMO_USERS.partenaire.id : null, name: u.name, role: u.role, scope: u.scope, status: u.status })));
     await tx.insert(t.incidents).values(TECH_INCIDENTS.map((i) => ({ id: i.id, icon: i.icon, title: i.title, when: i.when, tone: i.tone, status: i.status, meta: i.meta, description: i.description, table: i.table, action: i.action, actionIcon: i.actionIcon })));
     await tx.insert(t.visitReports).values(VISIT_REPORTS.map((v) => ({ schoolId: ORGANIZATIONS.find((o) => o.name === v.school)?.id ?? S, school: v.school, date: v.date, text: v.text })));
   });
