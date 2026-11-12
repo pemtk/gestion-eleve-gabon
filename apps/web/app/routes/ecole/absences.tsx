@@ -66,7 +66,7 @@ function Row({ r }: { r: AbsenceRow }) {
     return (
       <f.Form method="post" onSubmit={() => setEdit(false)} className={cols}>
         <input type="hidden" name="id" value={r.id} />
-        <div className="px-2">{r.student}</div><div className="px-2">{r.className}</div><div className="px-2">{r.date}</div>
+        <div className="px-2">{r.student}</div><div className="px-2">{r.className}</div><div className="px-2">{r.dateLabel}</div>
         <div className="px-1"><Select name="status" defaultValue={r.status} aria-label="Statut" className="!min-h-8 !text-[13px]">{(['P', 'A', 'R'] as const).map((s) => <option key={s} value={s}>{LABEL[s]}</option>)}</Select></div>
         <div className="px-1"><Select name="justification" defaultValue={r.justification ?? ''} aria-label="Justification" className="!min-h-8 !text-[13px]"><option value="">Non justifié</option>{JUSTIFICATIONS.map((j) => <option key={j}>{j}</option>)}</Select></div>
         <div className="flex px-1"><Button type="submit" variant="ghost" aria-label="Enregistrer"><Icon name="check" size={16} /></Button></div>
@@ -75,7 +75,7 @@ function Row({ r }: { r: AbsenceRow }) {
   }
   return (
     <div className={cols}>
-      <div className="px-2">{r.student}</div><div className="px-2">{r.className}</div><div className="px-2">{r.date}</div>
+      <div className="px-2">{r.student}</div><div className="px-2">{r.className}</div><div className="px-2">{r.dateLabel}</div>
       <div className="px-2"><Tag tone={r.status === 'A' ? 'warn' : 'n'}>{LABEL[r.status]}</Tag></div>
       <div className={r.justification ? 'px-2' : 'px-2 italic text-accent-800'}>{r.justification ?? 'Non justifié'}</div>
       <div className="px-1"><Button variant="ghost" aria-label={`Modifier l’absence de ${r.student}`} onClick={() => setEdit(true)}><Icon name="pencil" size={15} /></Button></div>

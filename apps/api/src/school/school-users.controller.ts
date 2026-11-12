@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { CurrentUser, Roles, schoolOf, type AuthUser } from '../common/auth.js';
 import { DB, type Db } from '../db/db.module.js';
 import { isUniqueViolation } from '../db/errors.js';
-import { classes, linkRequests, studentParents, students, teachers } from '../db/schema.js';
+import { assignments, classes, linkRequests, studentParents, students, teachers } from '../db/schema.js';
 import { SchoolPolicy } from './school.policy.js';
 
 const csvSchema = z.object({ csv: z.string().min(1) });
@@ -102,9 +102,19 @@ export class SchoolUsersController {
     return { imported: valid.length, skipped: rows.length - valid.length };
   }
 
+  /** Enseignants de l'école ; la colonne « Affectations » est calculée (« Maths · 3ème B, 4ème A »). */
   @Get('teachers')
-  teachers(@CurrentUser() user: AuthUser) {
-    return this.db.select().from(teachers).where(eq(teachers.schoolId, schoolOf(user))).orderBy(teachers.id);
+  async teachers(@CurrentUser() user: AuthUser) {
+    const sid = schoolOf(user);
+    const [rows, aff] = await Promise.all([
+      this.db.select().from(teachers).where(eq(teachers.schoolId, sid)).orderBy(teachers.id),
+      this.db.select({ a: assignments, className: classes.name }).from(assignments).innerJoin(classes, eq(classes.id, assignments.classId)).where(eq(assignments.schoolId, sid)).orderBy(classes.name),
+    ]);
+    return rows.map(({ userId: _u, ...t }) => {
+      const bySubject = new Map<string, string[]>();
+      for (const { a, className } of aff.filter(({ a }) => a.teacherId === t.id)) bySubject.set(a.subject, [...(bySubject.get(a.subject) ?? []), className]);
+      return { ...t, assignments: [...bySubject.entries()].map(([subject, cls]) => `${subject} · ${cls.join(', ')}`).join(' ; ') };
+    });
   }
 
   @Post('teachers/invite')
@@ -112,8 +122,8 @@ export class SchoolUsersController {
     const sid = schoolOf(user);
     await this.policy.assertWritable(sid);
     await this.policy.require(sid, 'sms');
-    const [teacher] = await this.db.insert(teachers).values({ id: randomUUID(), schoolId: sid, name: body.name, phone: `+241 ${body.phone}`, assignments: '', status: 'Invitation envoyée' }).returning();
-    return teacher;
+    const [teacher] = await this.db.insert(teachers).values({ id: randomUUID(), schoolId: sid, name: body.name, phone: `+241 ${body.phone}`, status: 'Invitation envoyée' }).returning();
+    return { ...teacher!, assignments: '' };
   }
 
   @Post('teachers/:id/resend')
@@ -122,7 +132,7 @@ export class SchoolUsersController {
     await this.policy.assertWritable(sid);
     const [t] = await this.db.update(teachers).set({ status: 'Invitation envoyée' }).where(and(eq(teachers.id, id), eq(teachers.schoolId, sid))).returning();
     if (!t) throw new NotFoundException();
-    return t;
+    return { ...t, assignments: '' };
   }
 
   @Get('link-requests')

@@ -46,6 +46,12 @@ export const STUDENTS: Student[] = [
   S('s6', 'Fabrice', 'Mintsa', '6c', '07110954', '538471', []),
   S('s7', 'Grâce', 'Nguema', '4a', '06214490', '190826', [['Alain Nguema', 'père']]),
   S('s8', 'Hervé', 'Mabika', '5b', null, '847335', []),
+  // Autres élèves de la 3ème B (la classe de démonstration compte ainsi huit élèves en base).
+  S('s9', 'Lionel', 'Bekale', '3b', '07334455', '410128', []),
+  S('s10', 'Mariam', 'Ondimba', '3b', '06223344', '520239', []),
+  S('s11', 'Nathan', 'Ekomi', '3b', '07112299', '630340', []),
+  S('s12', 'Océane', 'Ndzengue', '3b', '06998811', '740451', []),
+  S('s13', 'Patrick', 'Obame', '3b', '07445500', '850562', []),
 ];
 
 export const CLASSES: SchoolClass[] = [
@@ -84,20 +90,22 @@ export const SCHOOL_YEAR = {
   ],
 };
 
+/** Affectations des enseignants (enseignant, classe, matière). Serge Ndong (t1) est le compte enseignant de démonstration. */
 export const ASSIGNMENTS = [
-  { id: 'a1', teacher: 'Serge Ndong', className: '3ème B', subject: 'Mathématiques', year: '2026–2027', principal: true },
-  { id: 'a2', teacher: 'Serge Ndong', className: '4ème A', subject: 'Mathématiques', year: '2026–2027', principal: false },
-  { id: 'a3', teacher: 'Marie Ayo', className: '4ème A', subject: 'Français', year: '2026–2027', principal: true },
-  { id: 'a4', teacher: 'Rachel Nziengui', className: '3ème B', subject: 'Anglais', year: '2026–2027', principal: false },
+  { id: 'a1', teacherId: 't1', classId: '3b', subject: 'Mathématiques', year: '2026–2027', principal: true },
+  { id: 'a2', teacherId: 't1', classId: '4a', subject: 'Mathématiques', year: '2026–2027', principal: false },
+  { id: 'a5', teacherId: 't1', classId: '6c', subject: 'Mathématiques', year: '2026–2027', principal: false },
+  { id: 'a3', teacherId: 't2', classId: '4a', subject: 'Français', year: '2026–2027', principal: true },
+  { id: 'a4', teacherId: 't3', classId: '3b', subject: 'Anglais', year: '2026–2027', principal: false },
 ];
 
 /* ---- Vie scolaire : absences et signalements ---- */
-export interface Absence { id: string; student: string; className: string; date: string; status: AttendanceStatus; justification: string | null }
-export const ABSENCES: Absence[] = [
-  { id: 'ab1', student: 'Junior Ondo', className: 'CM2', date: '10 nov.', status: 'A', justification: null },
-  { id: 'ab2', student: 'Daniel Obiang', className: '3ème B', date: '10 nov.', status: 'R', justification: 'Transport' },
-  { id: 'ab3', student: 'Brice Nzé', className: '4ème A', date: '9 nov.', status: 'A', justification: 'Maladie' },
-  { id: 'ab4', student: 'Hervé Mabika', className: '5ème B', date: '9 nov.', status: 'A', justification: null },
+/** Appels de démonstration (ISO) : élèves absents ou en retard les 9 et 10 novembre. */
+export const ATTENDANCE_SEED: { classId: string; studentId: string; date: string; status: AttendanceStatus; justification: string | null }[] = [
+  { classId: 'sm-cm2', studentId: 'sm-junior', date: '2026-11-10', status: 'A', justification: null },
+  { classId: '3b', studentId: 's4', date: '2026-11-10', status: 'R', justification: 'Transport' },
+  { classId: '4a', studentId: 's2', date: '2026-11-09', status: 'A', justification: 'Maladie' },
+  { classId: '5b', studentId: 's8', date: '2026-11-09', status: 'A', justification: null },
 ];
 
 export const CONFIDENTIAL_CASES: ConfidentialCase[] = [
@@ -167,14 +175,6 @@ export const PARENT_ALERTS = [
 ];
 
 /* ---- Enseignant ---- */
-export const STUDENT_NAMES = ['Aïcha Ondo', 'Brice Nzé', 'Cyrielle Mba', 'Daniel Obiang', 'Emmanuella Moussavou', 'Fabrice Mintsa', 'Grâce Nguema', 'Hervé Mabika'];
-export const PARENT_CODES = ['482917', '305662', '771048', '219530', '664102', '538471', '190826', '847335'];
-export const PARENT_LINKED = [2, 1, 2, 0, 1, 0, 1, 0];
-export const TEACHER_CLASSES = [
-  { name: '3ème B', students: 38, pct: 74 },
-  { name: '4ème A', students: 42, pct: 61 },
-  { name: '6ème C', students: 45, pct: 41, alert: '11 élèves inactifs depuis 3 jours' },
-];
 /** Suivi d'une tâche : [statut, temps, auto-évaluation, preuve]. */
 export const FOLLOW_UP: [string, string, 'ok' | 'doubt' | '', boolean][] = [
   ['done', '24 min', 'ok', true], ['done', '3 min', 'ok', false], ['done', '31 min', 'doubt', true], ['none', '—', '', false],
@@ -480,7 +480,7 @@ export const SECOND_SCHOOL_DATA = {
     { id: 'bs2', firstName: 'Kevin', lastName: 'Ayingone', classId: 'b5a', phone: '07556677', code: '230156', parents: [] as [string, string][] },
   ],
   teacher: { id: 'bt1', name: 'Hélène Mavoungou', phone: '+241 07 66 77 88', assignments: 'Français · 6ème A', status: 'Activé' as const },
-  absence: { id: 'bab1', student: 'Kevin Ayingone', className: '5ème A', date: '10 nov.', status: 'A' as const, justification: null as string | null },
+  absence: { classId: 'b5a', studentId: 'bs2', date: '2026-11-10', status: 'A' as const, justification: null as string | null },
   announcement: { id: 'ban1', title: 'Réunion des parents', message: 'Réunion des parents de 6ème A le 18 novembre à 16 h.', audience: 'class', target: '6ème A' },
   case: { id: 'SC-0201', reporter: 'Enseignant · H. Mavoungou', className: '6ème A', type: 'Mal-être', received: 'hier, 10:15', student: 'Nadège Bivigou', text: 'L’élève s’isole depuis deux semaines et ne participe plus en classe.' },
 };

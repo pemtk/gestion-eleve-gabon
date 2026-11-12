@@ -56,15 +56,18 @@ describe('Isolation entre établissements', () => {
     // B tente d'agir sur des ressources de A
     await post('/school/students/s1/regenerate-code', b).expect(404);
     await post('/school/students/s1/send-code', b).expect(403); // formule Essentiel : refusé avant même de chercher
-    await c.api().patch('/school/absences/ab1').set(c.as(b)).send({ status: 'P' }).expect(404);
-    await post('/school/results/res0/correct', b, { value: 1, reason: 'tentative' }).expect(404);
+    const absenceA = (await get('/school/absences', a)).body[0].id;
+    const absenceB = (await get('/school/absences', b)).body[0].id;
+    const gradeA = (await get('/school/results', a)).body.rows.find((r: { id: string | null }) => r.id).id;
+    await c.api().patch(`/school/absences/${absenceA}`).set(c.as(b)).send({ status: 'P' }).expect(404);
+    await post(`/school/results/${gradeA}/correct`, b, { value: 1, reason: 'tentative' }).expect(404);
     await post('/school/teachers/t3/resend', b).expect(404);
     await post('/school/link-requests/r1/accept', b).expect(404);
     await get('/school/cases/SC-0142', b).expect(404);
     await post('/school/cases/SC-0142/acknowledge', b).expect(404);
     // …et A sur celles de B
     await post('/school/students/bs1/regenerate-code', a).expect(404);
-    await c.api().patch('/school/absences/bab1').set(c.as(a)).send({ status: 'P' }).expect(404);
+    await c.api().patch(`/school/absences/${absenceB}`).set(c.as(a)).send({ status: 'P' }).expect(404);
     await get('/school/cases/SC-0201', a).expect(404);
     await post('/school/cases/SC-0201/acknowledge', a).expect(404);
 
@@ -125,7 +128,7 @@ describe('Isolation entre établissements', () => {
 
   it('les profils scolaires (élève, enseignant) restent dans leur établissement', async () => {
     const db = dbOf(app);
-    await db.insert(tasks).values({ id: 'task-b', schoolId: SECOND_SCHOOL_ID, title: 'Tâche du Collège Bessieux', subject: 'Français', type: 'Cours', due: 'Demain' });
+    await db.insert(tasks).values({ id: 'task-b', schoolId: SECOND_SCHOOL_ID, classId: 'b6a', title: 'Tâche du Collège Bessieux', subject: 'Français', type: 'Cours', due: 'Demain' });
     const eleve = await c.token('eleve'); // élève du Lycée Léon Mba
     const prof = await c.token('enseignant');
 
@@ -134,7 +137,7 @@ describe('Isolation entre établissements', () => {
     await get('/me/student/tasks/task-b', eleve).expect(404);
     await post('/me/student/tasks/task-b/complete', eleve, { evaluation: 'ok', seconds: 300 }).expect(404);
     await get('/me/teacher/tasks/task-b/follow-up', prof).expect(404);
-    await post('/me/teacher/tasks/task-b/invalidate/0', prof).expect(404);
+    await post('/me/teacher/tasks/task-b/invalidate/bs1', prof).expect(404);
 
     // une tâche créée par l'enseignant de A est rattachée à A
     const created = (await post('/me/teacher/tasks', prof, { classId: '3b', subject: 'Maths', type: 'Cours', title: 'Chapitre 4', description: '', due: 'Demain' }).expect(201)).body;

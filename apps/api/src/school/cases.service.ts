@@ -24,13 +24,18 @@ export class CasesService {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   private async get(id: string, schoolId: string): Promise<CaseRow> {
-    const [row] = await this.db.select().from(cases).where(and(eq(cases.id, id), eq(cases.schoolId, schoolId)));
+    const [row] = await this.db.select().from(cases).where(and(eq(cases.id, id), eq(cases.schoolId, schoolId), eq(cases.kind, 'confidentiel')));
     if (!row) throw new NotFoundException('Signalement introuvable.');
     return row;
   }
 
   async list(schoolId: string) {
-    return (await this.db.select().from(cases).where(eq(cases.schoolId, schoolId)).orderBy(cases.id)).map((c) => ({ ...toInfo(c), step: c.step }));
+    return (await this.db.select().from(cases).where(and(eq(cases.schoolId, schoolId), eq(cases.kind, 'confidentiel'))).orderBy(cases.id)).map((c) => ({ ...toInfo(c), step: c.step }));
+  }
+
+  /** Signalements « conduite / engagement » : visibles de l'école, sans processus de traitement du référent. */
+  async conduct(schoolId: string) {
+    return (await this.db.select().from(cases).where(and(eq(cases.schoolId, schoolId), eq(cases.kind, 'conduite'))).orderBy(sql`${cases.createdAt} desc`)).map(toInfo);
   }
 
   async detail(id: string, schoolId: string) {

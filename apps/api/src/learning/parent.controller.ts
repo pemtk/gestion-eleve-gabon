@@ -1,12 +1,13 @@
 import { BadRequestException, Body, ConflictException, Controller, Get, Inject, NotFoundException, Param, Post, Put } from '@nestjs/common';
-import { and, eq, gte, inArray, ne } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull } from 'drizzle-orm';
 import { ALERT_PREFS, PARENT_ALERTS, linkChildSchema, rewardSchema } from '@sge/shared';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { CurrentUser, Roles, type AuthUser } from '../common/auth.js';
 import { DB, type Db } from '../db/db.module.js';
-import { absences, alertPrefs, classes, linkRequests, organizations, rewards, studentParents, students, subjectGrades, tasks, workSessions } from '../db/schema.js';
+import { alertPrefs, attendanceRecords, classes, linkRequests, organizations, rewards, studentParents, students, taskCompletions, tasks, workSessions } from '../db/schema.js';
 import { getLearner } from './learner.js';
+import { dateLabel, recentGrades, subjectResults } from './results.js';
 
 const prefsSchema = z.array(z.object({ id: z.string(), on: z.boolean() }));
 const DAY_LABELS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
@@ -39,12 +40,12 @@ export class ParentController {
   @Get('children')
   async children(@CurrentUser() user: AuthUser) {
     const rows = await this.kids(user.sub);
-    const unjustified = await this.db.select().from(absences).where(and(eq(absences.status, 'A'), inArray(absences.schoolId, [...new Set(rows.map((r) => r.s.schoolId))])));
+    const ids = rows.map((r) => r.s.id);
+    const unjustified = ids.length ? await this.db.select().from(attendanceRecords).where(and(eq(attendanceRecords.status, 'A'), isNull(attendanceRecords.justification), inArray(attendanceRecords.studentId, ids))).orderBy(desc(attendanceRecords.date)) : [];
     return Promise.all(rows.map(async ({ s, className, school }) => {
-      const name = `${s.firstName} ${s.lastName}`;
-      const absence = unjustified.find((a) => a.schoolId === s.schoolId && a.student === name && !a.justification);
+      const absence = unjustified.find((a) => a.studentId === s.id);
       let status = 'Aucune activité enregistrée pour l’instant.';
-      if (absence) status = `Absent le ${absence.date.replace(/\.$/, '')}. Justifiez ou écrivez à l’école.`;
+      if (absence) status = `Absent le ${dateLabel(absence.date).replace(/\.$/, '')}. Justifiez ou écrivez à l’école.`;
       else if (s.userId) {
         const l = await getLearner(this.db, s.userId);
         status = `Tout va bien. ${l.doneToday} tâche${l.doneToday > 1 ? 's' : ''} faite${l.doneToday > 1 ? 's' : ''} aujourd’hui.`;
@@ -57,7 +58,9 @@ export class ParentController {
   async child(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     const { s, className, school } = await this.kid(user.sub, id);
     const l = s.userId ? await getLearner(this.db, s.userId) : { points: 0, streak: 0, doneToday: 0 };
-    const todo = (await this.db.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.schoolId, s.schoolId), ne(tasks.status, 'done')))).length;
+    const classTasks = await this.db.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.schoolId, s.schoolId), eq(tasks.classId, s.classId)));
+    const doneIds = new Set((await this.db.select({ id: taskCompletions.taskId }).from(taskCompletions).where(and(eq(taskCompletions.studentId, s.id), eq(taskCompletions.status, 'done')))).map((c) => c.id));
+    const todo = classTasks.filter((t) => !doneIds.has(t.id)).length;
 
     // Temps de travail des 7 derniers jours, jour par jour (séances enregistrées à la fin de chaque tâche).
     const since = new Date(); since.setHours(0, 0, 0, 0); since.setDate(since.getDate() - 6);
@@ -69,7 +72,7 @@ export class ParentController {
     });
 
     const mine = (await this.db.select().from(rewards).where(eq(rewards.ownerId, user.sub))).filter((r) => r.threshold > l.points).sort((a, b) => a.threshold - b.threshold)[0];
-    const grades = s.userId ? await this.db.select().from(subjectGrades).where(eq(subjectGrades.userId, s.userId)).orderBy(subjectGrades.id).limit(2) : [];
+    const grades = recentGrades(await subjectResults(this.db, s.schoolId, s.id, 'T1'));
     return {
       kid: { id: s.id, name: s.firstName, initials: `${s.firstName[0]}${s.lastName[0]}`.toUpperCase(), className, school },
       stats: [
@@ -80,7 +83,7 @@ export class ParentController {
       ],
       week, weekTotalLabel: hoursLabel(week.reduce((n, w) => n + w.minutes, 0)),
       reward: mine ? { label: mine.label, threshold: mine.threshold, points: l.points, left: mine.threshold - l.points } : null,
-      lastGrades: grades.map((g) => ({ subject: g.subject, value: g.notes.at(-1)!.value })),
+      lastGrades: grades.map((g) => ({ subject: g.subject, value: g.value })),
     };
   }
 

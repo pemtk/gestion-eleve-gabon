@@ -10,7 +10,7 @@ import { useSchoolName } from '~/lib/school';
 import type { Route } from './+types/config';
 
 type Year = typeof SCHOOL_YEAR;
-type Assignment = { id: string; teacher: string; className: string; subject: string; year: string; principal: boolean };
+type Assignment = { id: string; teacherId: string; classId: string; teacher: string; className: string; subject: string; year: string; principal: boolean };
 const TABS = ['annees', 'classes', 'affect'] as const;
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -36,7 +36,7 @@ export async function action({ request }: Route.ActionArgs) {
     case 'class':
       return run(() => api.post('/school/classes', { level: str(fd, 'level'), name: str(fd, 'name'), capacity: Number(str(fd, 'capacity')) }), 'Classe créée.');
     case 'assign':
-      return run(() => api.post('/school/assignments', { teacher: str(fd, 'teacher'), className: str(fd, 'className'), subject: str(fd, 'subject'), year: str(fd, 'year'), principal: flag(fd, 'principal') }), 'Affectation enregistrée.');
+      return run(() => api.post('/school/assignments', { teacherId: str(fd, 'teacherId'), classId: str(fd, 'classId'), subject: str(fd, 'subject'), year: str(fd, 'year'), principal: flag(fd, 'principal') }), 'Affectation enregistrée.');
   }
   return null;
 }
@@ -139,8 +139,8 @@ function Assignments({ d }: { d: Route.ComponentProps['loaderData'] }) {
       <Section title="Nouvelle affectation">
         <Form method="post" className="flex flex-col gap-3">
           <input type="hidden" name="intent" value="assign" /><input type="hidden" name="year" value={d.year.label} />
-          <Field label="Enseignant"><Select name="teacher" required>{d.teachers.filter((t) => t.status === 'Activé').map((t) => <option key={t.id}>{t.name}</option>)}</Select></Field>
-          <Field label="Classe"><Select name="className" required>{d.classes.map((c) => <option key={c.id}>{c.name}</option>)}</Select></Field>
+          <Field label="Enseignant"><Select name="teacherId" required>{d.teachers.filter((t) => t.status === 'Activé').map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></Field>
+          <Field label="Classe"><Select name="classId" required>{d.classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
           <Field label="Matière"><Input name="subject" placeholder="Ex. Mathématiques" required /></Field>
           <Field label="Année scolaire"><Input value={d.year.label} readOnly /></Field>
           <Toggle name="principal" label="Professeur principal" checked={principal} onChange={setPrincipal} />

@@ -1,17 +1,18 @@
 import { useState } from 'react';
-import { useFetcher } from 'react-router';
+import { useFetcher, useSearchParams } from 'react-router';
 import { formatGrade } from '@sge/shared';
-import { PageHeader } from '~/components/blocks';
-import { Button, Dialog, Field, Input, Notice, Section, Tag, Textarea } from '~/components/ui';
+import { EmptyState, PageHeader } from '~/components/blocks';
+import { Button, Dialog, Field, Input, Notice, Section, Select, Tag, Textarea } from '~/components/ui';
 import { run, spaceApi } from '~/lib/api.server';
 import { str } from '~/lib/form';
 import type { Route } from './+types/results';
 
-type Result = { id: string; student: string; value: number | null; coefficient: number; published: boolean; history: { from: number; to: number; reason: string }[] };
-type Data = { className: string; subject: string; term: string; evaluation: string; average: number | null; rows: Result[] };
+type Result = { id: string | null; student: string; value: number | null; coefficient: number; published: boolean; history: { from: number; to: number; reason: string }[] };
+type Data = { evaluations: { id: string; label: string; subject: string; trimester: string; className: string }[]; evaluationId: string | null; className: string; subject: string; term: string; evaluation: string; average: number | null; rows: Result[] };
 
 export async function loader({ request }: Route.LoaderArgs) {
-  return (await spaceApi(request, 'ecole')).get<Data>('/school/results');
+  const evaluation = new URL(request.url).searchParams.get('evaluation');
+  return (await spaceApi(request, 'ecole')).get<Data>(`/school/results${evaluation ? `?evaluation=${encodeURIComponent(evaluation)}` : ''}`);
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -24,9 +25,23 @@ export async function action({ request }: Route.ActionArgs) {
 export default function Results({ loaderData: d }: Route.ComponentProps) {
   const [target, setTarget] = useState<Result | null>(null);
   const f = useFetcher<{ ok: boolean; error?: string; message?: string }>();
+  const [, setParams] = useSearchParams();
+  if (!d.evaluationId) {
+    return (
+      <>
+        <PageHeader kicker="Résultats › Notes" title="Résultats" />
+        <Section><EmptyState icon="award" title="Aucune note publiée" text="Les notes apparaissent ici dès qu’un enseignant les publie depuis son application." /></Section>
+      </>
+    );
+  }
   return (
     <>
       <PageHeader kicker="Résultats › Notes" title={`${d.subject} · ${d.className}`} filters={[{ icon: 'school', label: d.className }, { icon: 'calendar', label: d.term }]} />
+      <label className="flex items-center gap-2 text-[13px] text-neutral-700">Évaluation
+        <Select value={d.evaluationId} onChange={(e) => setParams({ evaluation: e.target.value })} className="!w-auto">
+          {d.evaluations.map((e) => <option key={e.id} value={e.id}>{e.className} · {e.subject} · {e.label}</option>)}
+        </Select>
+      </label>
       {f.data?.ok && <Notice>{f.data.message}</Notice>}
       <Section title={d.evaluation} note={<>Moyenne de la classe <span className="tnum font-heading text-[20px] text-text">{d.average === null ? '–' : formatGrade(d.average)}</span> /20</>} className="overflow-x-auto">
         <div className="min-w-[520px]">
@@ -34,12 +49,12 @@ export default function Results({ loaderData: d }: Route.ComponentProps) {
             {['Élève', 'Note', 'Coef.', 'État', ''].map((h, i) => <div key={i} className="px-2 py-2.5">{h}</div>)}
           </div>
           {d.rows.map((r) => (
-            <div key={r.id} className="grid grid-cols-[1.6fr_.8fr_.8fr_1.2fr_.7fr] items-center border-b border-divider text-[13.5px]">
+            <div key={r.id ?? r.student} className="grid grid-cols-[1.6fr_.8fr_.8fr_1.2fr_.7fr] items-center border-b border-divider text-[13.5px]">
               <div className="px-2 py-2.5">{r.student}</div>
               <div className="tnum px-2 font-heading text-[20px]">{r.value === null ? '–' : <>{formatGrade(r.value)}<span className="text-[13px] text-neutral-600">/20</span></>}</div>
               <div className="tnum px-2">{r.coefficient}</div>
               <div className="px-2">{r.value === null ? <Tag>Non saisie</Tag> : r.history.length ? <Tag tone="warn">Corrigée</Tag> : <Tag tone="hi">Publiée</Tag>}</div>
-              <div className="px-2">{r.value !== null && <Button variant="ghost" onClick={() => setTarget(r)}>Corriger</Button>}</div>
+              <div className="px-2">{r.value !== null && r.id && <Button variant="ghost" onClick={() => setTarget(r)}>Corriger</Button>}</div>
             </div>
           ))}
         </div>

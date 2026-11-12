@@ -7,7 +7,7 @@ import { run, spaceApi } from '~/lib/api.server';
 import { flag, str } from '~/lib/form';
 import type { Route } from './+types/referent';
 
-type Data = { referent: { name: string; confirmed: boolean } | null; confidentialEnabled: boolean; delays: { acknowledgeHours: number; evaluationHours: number }; cases: { id: string; type: string; className: string; received: string; step: number; student: string }[] };
+type Data = { referent: { name: string; confirmed: boolean } | null; confidentialEnabled: boolean; delays: { acknowledgeHours: number; evaluationHours: number }; cases: { id: string; type: string; className: string; received: string; step: number; student: string }[]; conduct: { id: string; type: string; className: string; received: string; student: string; reporter: string; text: string }[] };
 
 export async function loader({ request }: Route.LoaderArgs) {
   return (await spaceApi(request, 'ecole')).get<Data>('/school/referent');
@@ -55,6 +55,16 @@ export default function Referent({ loaderData: d, actionData }: Route.ComponentP
           ))}
         </Section>
       </div>
+      <Section title="Conduite et engagement" note="signalés par les enseignants, visibles de l’école">
+        {d.conduct.map((c) => (
+          <div key={c.id} className="border-t border-divider py-3 text-[14px]">
+            <div className="font-semibold">#{c.id} · {c.student} <span className="font-normal text-neutral-700">· {c.className}</span></div>
+            <div className="text-neutral-800">{c.text}</div>
+            <div className="text-[12.5px] text-neutral-600">{c.reporter} · {c.received}</div>
+          </div>
+        ))}
+        {!d.conduct.length && <p className="text-[13.5px] italic text-neutral-600">Aucun signalement de conduite.</p>}
+      </Section>
     </>
   );
 }

@@ -59,8 +59,10 @@ describe('API (e2e, PostgreSQL)', () => {
 
   it('exige un motif pour corriger une note publiée', async () => {
     const ecole = await token_('etablissement');
-    await api_().post('/school/results/res0/correct').set(as_(ecole)).send({ value: 16, reason: '' }).expect(400);
-    const res = await api_().post('/school/results/res0/correct').set(as_(ecole)).send({ value: 16, reason: 'Erreur de saisie' }).expect(201);
+    const { body } = await api_().get('/school/results').set(as_(ecole)).expect(200);
+    const row = body.rows.find((r: { student: string }) => r.student === 'Aïcha Ondo');
+    await api_().post(`/school/results/${row.id}/correct`).set(as_(ecole)).send({ value: 16, reason: '' }).expect(400);
+    const res = await api_().post(`/school/results/${row.id}/correct`).set(as_(ecole)).send({ value: 16, reason: 'Erreur de saisie' }).expect(201);
     expect(res.body.value).toBe(16);
   });
 
