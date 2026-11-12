@@ -1,0 +1,53 @@
+name: Application mobile (EAS)
+
+# - Push sur main touchant apps/mobile : mise à jour OTA (canal « preview »).
+# - Tag mobile-vX.Y.Z ou lancement manuel : builds Android/iOS via EAS Build.
+# Secret requis : EXPO_TOKEN (https://expo.dev/accounts/<compte>/settings/access-tokens).
+on:
+  push:
+    branches: [main]
+    paths: ['apps/mobile/**', 'packages/**']
+    tags: ['mobile-v*']
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Plateforme à construire
+        type: choice
+        options: [android, ios, all]
+        default: android
+      profile:
+        description: Profil EAS
+        type: choice
+        options: [preview, production]
+        default: preview
+
+permissions:
+  contents: read
+
+jobs:
+  eas:
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - name: Vérifier le secret EXPO_TOKEN
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then echo "::warning::EXPO_TOKEN absent : étape EAS ignorée."; echo "SKIP=1" >> "$GITHUB_ENV"; fi
+      - uses: actions/checkout@v4
+        if: env.SKIP != '1'
+      - uses: actions/setup-node@v4
+        if: env.SKIP != '1'
+        with: { node-version-file: .nvmrc, cache: npm }
+      - uses: expo/expo-github-action@v8
+        if: env.SKIP != '1'
+        with: { eas-version: latest, token: '${{ secrets.EXPO_TOKEN }}' }
+      - run: npm ci && npm run build:packages
+        if: env.SKIP != '1'
+      - name: Mise à jour OTA (canal preview)
+        if: env.SKIP != '1' && github.ref == 'refs/heads/main'
+        working-directory: apps/mobile
+        run: eas update --channel preview --message "${{ github.sha }}" --non-interactive
+      - name: Build (tag ou lancement manuel)
+        if: env.SKIP != '1' && (startsWith(github.ref, 'refs/tags/mobile-v') || github.event_name == 'workflow_dispatch')
+        working-directory: apps/mobile
+        run: eas build --platform "${{ inputs.platform || 'android' }}" --profile "${{ inputs.profile || 'production' }}" --non-interactive --no-wait

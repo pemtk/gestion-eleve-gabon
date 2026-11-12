@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+.react-router/
+.expo/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+coverage/
+.DS_Store
+expo-env.d.ts
+ios/
+android/

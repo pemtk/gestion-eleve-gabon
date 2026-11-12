@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Paquets partagés + API (NestJS + PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: sge, POSTGRES_PASSWORD: sge, POSTGRES_DB: sge_test }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U sge -d sge_test" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://sge:sge@localhost:5432/sge_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      - run: npm run build:packages
+      - name: Typecheck
+        run: npm run typecheck -w @sge/shared -w @sge/api
+      - name: Lint API
+        run: npm run lint -w @sge/api
+      - name: Tests (paquet partagé)
+        run: npm test -w @sge/shared
+      - name: Les migrations SQL correspondent au schéma
+        run: |
+          npm run db:generate -w @sge/api
+          git diff --exit-code -- apps/api/drizzle || (echo "Schéma modifié sans migration : lancer npm run db:generate -w @sge/api" && exit 1)
+          git status --porcelain apps/api/drizzle | grep . && exit 1 || true
+      - name: "Tests (API : unitaires + intégration sur PostgreSQL)"
+        run: npm test -w @sge/api
+      - name: Build API
+        run: npm run build -w @sge/api
+
+  web:
+    name: Web (React Router + Tailwind)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      - run: npm run build:packages
+      - name: Typecheck
+        run: npm run typecheck -w @sge/web
+      - name: Build
+        run: npm run build -w @sge/web
+      - name: Les icônes générées sont à jour
+        run: |
+          npm run icons -w @sge/web
+          git diff --exit-code -- apps/web/app/components/icons.generated.ts
+
+  mobile:
+    name: Mobile (Expo)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      - run: npm run build:packages
+      - name: Typecheck
+        run: npm run typecheck -w @sge/mobile
+      - name: Les icônes générées sont à jour
+        run: |
+          npm run icons -w @sge/mobile
+          git diff --exit-code -- apps/mobile/src/components/icons.generated.ts
+      - name: Bundle Android (compilation Metro + Hermes)
+        run: npx expo export --platform android --output-dir "$RUNNER_TEMP/android"
+        working-directory: apps/mobile
+        env: { CI: '1', EXPO_NO_TELEMETRY: '1' }
+
+  docker:
+    name: Images Docker (construction à blanc)
+    runs-on: ubuntu-latest
+    needs: [backend, web]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with: { context: ., file: apps/api/Dockerfile, push: false, cache-from: type=gha, cache-to: 'type=gha,mode=max' }
+      - uses: docker/build-push-action@v6
+        with: { context: ., file: apps/web/Dockerfile, push: false, cache-from: type=gha, cache-to: 'type=gha,mode=max' }
