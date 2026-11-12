@@ -8,7 +8,7 @@ import { AuthController } from './auth/auth.controller.js';
 import { AuthService } from './auth/auth.service.js';
 import { SmsGateway } from './auth/sms.gateway.js';
 import { AuthGuard, RolesGuard } from './common/auth.js';
-import { StoreService } from './common/store.service.js';
+import { DbModule } from './db/db.module.js';
 import { DashboardController } from './dashboard/dashboard.controller.js';
 import { HealthController } from './health.controller.js';
 import { AccountController } from './learning/account.controller.js';
@@ -34,7 +34,7 @@ export function jwtSecret(): string {
 
 @Global()
 @Module({
-  imports: [JwtModule.register({ global: true, secret: jwtSecret(), signOptions: { expiresIn: '12h' } })],
+  imports: [DbModule, JwtModule.register({ global: true, secret: jwtSecret(), signOptions: { expiresIn: '12h' } })],
   controllers: [
     HealthController, AuthController, DashboardController,
     SchoolUsersController, SchoolConfigController, SchoolLifeController, SchoolSubscriptionController,
@@ -42,11 +42,10 @@ export function jwtSecret(): string {
     AgentController, PartnerController, AdminController,
   ],
   providers: [
-    StoreService, AuthService, SmsGateway, CasesService, SchoolPolicy, PartnerService,
+    AuthService, SmsGateway, CasesService, SchoolPolicy, PartnerService,
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_PIPE, useValue: new StandardSchemaValidationPipe() },
   ],
-  exports: [StoreService],
 })
 export class AppModule {}

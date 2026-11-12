@@ -1,24 +1,29 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { planHas, type PlanFeatureKey } from '@sge/shared';
-import { StoreService } from '../common/store.service.js';
+import { DB, type Db } from '../db/db.module.js';
+import { getSetting } from '../db/settings.js';
 
 /** Règles d'abonnement : suspendu = consultation seule ; certaines fonctions dépendent de la formule. */
 @Injectable()
 export class SchoolPolicy {
-  constructor(private readonly store: StoreService) {}
+  constructor(@Inject(DB) private readonly db: Db) {}
 
-  get features() {
-    return planHas(this.store.subscription.plan);
+  subscription() {
+    return getSetting(this.db, 'subscription');
   }
 
-  assertWritable() {
-    if (this.store.subscription.suspended) {
+  async features() {
+    return planHas((await this.subscription()).plan);
+  }
+
+  async assertWritable() {
+    if ((await this.subscription()).suspended) {
       throw new ForbiddenException({ code: 'SUBSCRIPTION_SUSPENDED', message: 'Abonnement suspendu : consultation seule.' });
     }
   }
 
-  require(feature: PlanFeatureKey) {
-    if (!this.features[feature]) {
+  async require(feature: PlanFeatureKey) {
+    if (!(await this.features())[feature]) {
       throw new ForbiddenException({ code: 'PLAN_REQUIRED', feature, message: 'Cette fonction n’est pas incluse dans votre formule.' });
     }
   }

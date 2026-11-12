@@ -1,18 +1,20 @@
-import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Inject, NotFoundException, Param, Post, Query } from '@nestjs/common';
+import { and, eq } from 'drizzle-orm';
 import {
   ANNOUNCE_TEMPLATES, FOLLOW_UP, PARENT_CODES, PARENT_LINKED, STUDENT_NAMES, TEACHER_CLASSES, announcementSchema,
   attendanceSchema, formatCode, gradeInputSchema, initials, reportInputSchema, taskInputSchema,
 } from '@sge/shared';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { Roles } from '../common/auth.js';
-import { StoreService } from '../common/store.service.js';
+import { DB, type Db } from '../db/db.module.js';
+import { attendanceRecords, taskInvalidations, tasks } from '../db/schema.js';
+import { getSetting } from '../db/settings.js';
 
 @Roles('enseignant')
 @Controller('me/teacher')
 export class TeacherController {
-  private readonly attendance = new Map<string, Record<string, string>>();
-  private readonly invalid = new Set<number>();
-  constructor(private readonly store: StoreService) {}
+  constructor(@Inject(DB) private readonly db: Db) {}
 
   @Get('home')
   home() {
@@ -24,31 +26,35 @@ export class TeacherController {
   }
 
   @Get('attendance')
-  roll(@Query('classId') classId = '3b', @Query('date') date = 'today') {
-    const saved = this.attendance.get(`${classId}:${date}`) ?? {};
-    return STUDENT_NAMES.map((name, i) => ({ studentId: `s${i + 1}`, name, initials: initials(name), status: saved[`s${i + 1}`] ?? 'P' }));
+  async roll(@Query('classId') classId = '3b', @Query('date') date = 'today') {
+    const saved = await this.db.select().from(attendanceRecords).where(and(eq(attendanceRecords.classId, classId), eq(attendanceRecords.date, date)));
+    return STUDENT_NAMES.map((name, i) => ({ studentId: `s${i + 1}`, name, initials: initials(name), status: saved.find((r) => r.studentId === `s${i + 1}`)?.status ?? 'P' }));
   }
 
-  /** §6.5 — l'appel notifie les parents des absents et des retardataires. */
+  /** §6.5 — l'appel est enregistré (une seule fois par classe et par date) et notifie les parents des absents/retardataires. */
   @Post('attendance')
-  saveAttendance(@Body({ schema: attendanceSchema }) body: z.infer<typeof attendanceSchema>) {
-    this.attendance.set(`${body.classId}:${body.date}`, Object.fromEntries(body.entries.map((e) => [e.studentId, e.status])));
+  async saveAttendance(@Body({ schema: attendanceSchema }) body: z.infer<typeof attendanceSchema>) {
+    await this.db.transaction(async (tx) => {
+      await tx.delete(attendanceRecords).where(and(eq(attendanceRecords.classId, body.classId), eq(attendanceRecords.date, body.date)));
+      if (body.entries.length) await tx.insert(attendanceRecords).values(body.entries.map((e) => ({ classId: body.classId, date: body.date, studentId: e.studentId, status: e.status, justification: e.justification ?? null })));
+    });
     return { saved: body.entries.length, parentsNotified: body.entries.filter((e) => e.status !== 'P').length };
   }
 
   @Post('tasks')
-  createTask(@Body({ schema: taskInputSchema }) body: z.infer<typeof taskInputSchema>) {
-    const task = { id: `k${this.store.tasks.length + 1}`, title: body.title, subject: body.subject, type: body.type, due: body.due, status: 'todo' as const, estimate: body.estimateMinutes ? `${body.estimateMinutes} min` : '—' };
-    this.store.tasks.push(task);
+  async createTask(@Body({ schema: taskInputSchema }) body: z.infer<typeof taskInputSchema>) {
+    const [task] = await this.db.insert(tasks).values({ id: randomUUID(), title: body.title, subject: body.subject, type: body.type, due: body.due, status: 'todo', estimate: body.estimateMinutes ? `${body.estimateMinutes} min` : '—' }).returning();
     return { task, notified: { students: 38, parents: 61 } };
   }
 
   @Get('tasks/:id/follow-up')
-  followUp(@Param('id') id: string) {
-    if (!this.store.tasks.some((t) => t.id === id)) throw new NotFoundException('Tâche introuvable.');
+  async followUp(@Param('id') id: string) {
+    const [t] = await this.db.select({ id: tasks.id }).from(tasks).where(eq(tasks.id, id));
+    if (!t) throw new NotFoundException('Tâche introuvable.');
+    const invalid = new Set((await this.db.select().from(taskInvalidations).where(eq(taskInvalidations.taskId, id))).map((r) => r.studentIndex));
     const rows = STUDENT_NAMES.map((name, i) => {
       const [status, time, evaluation, proof] = FOLLOW_UP[i]!;
-      const redo = this.invalid.has(i);
+      const redo = invalid.has(i);
       return { index: i, name, initials: initials(name), status: redo ? 'redo' : status, time: redo ? 'points annulés' : time, evaluation, proof: proof && !redo };
     });
     return { rows, doubts: rows.filter((r) => r.evaluation === 'doubt').length };
@@ -56,10 +62,10 @@ export class TeacherController {
 
   /** §6.3 — Invalider : la tâche revient à faire et les points sont annulés. */
   @Post('tasks/:id/invalidate/:index')
-  invalidate(@Param('index') index: string) {
+  async invalidate(@Param('id') id: string, @Param('index') index: string) {
     const i = Number(index);
     if (!Number.isInteger(i) || FOLLOW_UP[i]?.[0] !== 'done') throw new BadRequestException('Seule une tâche terminée peut être invalidée.');
-    this.invalid.add(i);
+    await this.db.insert(taskInvalidations).values({ taskId: id, studentIndex: i }).onConflictDoNothing();
     return { invalidated: true, pointsCancelled: 20 };
   }
 
@@ -70,8 +76,8 @@ export class TeacherController {
 
   /** §6.7 — le type « Confidentiel » exige un référent vie scolaire confirmé (§7.10). */
   @Post('reports')
-  report(@Body({ schema: reportInputSchema }) body: z.infer<typeof reportInputSchema>) {
-    if (body.kind === 'confidentiel' && !this.store.referent?.confirmed) {
+  async report(@Body({ schema: reportInputSchema }) body: z.infer<typeof reportInputSchema>) {
+    if (body.kind === 'confidentiel' && !(await getSetting(this.db, 'referent'))?.confirmed) {
       throw new BadRequestException('Aucun référent vie scolaire désigné : seul le signalement « Conduite / engagement » est disponible.');
     }
     return { sent: true, referentNotified: true, detailShared: body.kind !== 'confidentiel' };

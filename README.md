@@ -18,7 +18,7 @@ un accent doré, filets fins, contours plutôt que aplats).
 
 ```
 apps/
-  api/      NestJS 12 (ESM) — REST /api, JWT, validation zod, Vitest
+  api/      NestJS 12 (ESM) — REST /api, JWT, validation zod, PostgreSQL (Drizzle ORM), Vitest
   web/      React Router 8 (mode framework, SSR) + Tailwind v4
   mobile/   Expo SDK 58 + expo-router, French UI, file d'attente hors ligne
 packages/
@@ -36,8 +36,11 @@ Node ≥ 22.
 
 ```bash
 npm install
+docker compose up -d db    # PostgreSQL 16 sur localhost:5432 (ou votre propre serveur)
+cp .env.example .env       # DATABASE_URL, secrets…
 npm run build:packages     # compile packages/shared et packages/design-tokens
-npm run dev:api            # http://localhost:3000/api/health
+export DATABASE_URL=postgres://sge:sge@localhost:5432/sge
+npm run dev:api            # applique les migrations, charge la démo, puis http://localhost:3000/api/health
 npm run dev:web            # http://localhost:5173
 npm run dev:mobile         # Expo (QR code / émulateur)
 ```
@@ -56,8 +59,29 @@ Tout lancer avec Docker : `docker compose up --build` (web : 5173, API : 3000).
 ```bash
 npm run typecheck   # tous les paquets
 npm run lint        # API (oxlint)
-npm test            # paquet partagé + API (unitaires et e2e)
+npm test            # paquet partagé + API (unitaires, puis intégration sur PostgreSQL)
 ```
+
+Les tests d'intégration de l'API exigent `DATABASE_URL` vers une base **dédiée aux tests**
+(elle est vidée à chaque test) : `export DATABASE_URL=postgres://sge:sge@localhost:5432/sge_test`.
+
+## Base de données
+
+PostgreSQL via [Drizzle ORM](https://orm.drizzle.team) : schéma dans `apps/api/src/db/schema.ts`,
+migrations SQL versionnées dans `apps/api/drizzle/`.
+
+```bash
+npm run db:generate -w @sge/api   # après une modification du schéma : crée la migration (à commiter)
+npm run db:migrate  -w @sge/api   # applique les migrations (l'API le fait aussi au démarrage)
+npm run db:seed     -w @sge/api   # REMET À ZÉRO puis charge le jeu de démonstration
+```
+
+- Au démarrage, l'API applique les migrations (`RUN_MIGRATIONS=false` pour les jouer à part).
+- Le jeu de démonstration (Lycée Léon Mba) n'est chargé que dans une **base vide** et jamais par défaut en production
+  (`SEED_DEMO=true` pour le forcer, par exemple pour une préproduction).
+- Garanties assurées par la base : codes parents uniques, un message hors ligne n'est enregistré qu'une fois
+  (index unique sur `client_id`), une tâche n'est validée qu'une fois, les transitions d'un signalement
+  confidentiel sont atomiques, les corrections de notes sont historisées.
 
 ## CI/CD (GitHub Actions)
 
@@ -72,9 +96,10 @@ Production : `JWT_SECRET` (API) et `SESSION_SECRET` (web) sont **obligatoires** 
 
 ## Limites connues (à traiter avant une mise en production)
 
-- **Persistance** : l'API garde ses données **en mémoire** (`apps/api/src/common/store.service.ts`),
-  initialisées depuis `packages/shared/src/seed.ts`. Elles sont perdues au redémarrage. C'est le seul
-  endroit à remplacer par une base de données (Nest propose TypeORM, Drizzle, Mongoose…).
+- **Indicateurs** : les tableaux de bord (taux, volumes) affichent les valeurs du jeu de démonstration ; leur calcul
+  à partir des données réelles (activité, présences…) reste à écrire.
+- **Un seul établissement** : les données ne sont pas encore cloisonnées par école (pas de colonne `school_id`) ;
+  les tâches sont communes à tous les élèves de démonstration. Prérequis avant d'accueillir plusieurs écoles.
 - **SMS** : `SmsGateway` journalise les messages ; brancher l'opérateur SMS (OTP, alertes, invitations).
 - **Fichiers** : photos de preuve, pièces jointes et images de messagerie sont des indicateurs, sans stockage.
 - **QR code** : l'écran « scanner » du parent est une maquette ; la saisie du code à 6 chiffres est fonctionnelle.

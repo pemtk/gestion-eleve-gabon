@@ -23,7 +23,9 @@ COPY --from=build /app/packages/shared/package.json /app/packages/shared/
 COPY --from=build /app/packages/shared/dist /app/packages/shared/dist
 COPY --from=build /app/apps/api/package.json /app/apps/api/
 COPY --from=build /app/apps/api/dist /app/apps/api/dist
+# Migrations SQL appliquées au démarrage (RUN_MIGRATIONS=false pour les jouer à part : npm run db:migrate)
+COPY --from=build /app/apps/api/drizzle /app/apps/api/drizzle
 USER node
 EXPOSE 3000
-# JWT_SECRET est obligatoire en production (voir .env.example)
+# DATABASE_URL et JWT_SECRET sont obligatoires en production (voir .env.example)
 CMD ["node", "apps/api/dist/main.js"]

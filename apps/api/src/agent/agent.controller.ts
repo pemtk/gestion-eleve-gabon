@@ -1,13 +1,15 @@
-import { Body, Controller, Get, NotFoundException, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Inject, NotFoundException, Param, Post } from '@nestjs/common';
+import { desc, eq } from 'drizzle-orm';
 import { AGENT_SCHOOL, DASHBOARDS, visitReportSchema } from '@sge/shared';
 import { z } from 'zod';
 import { Roles } from '../common/auth.js';
-import { StoreService } from '../common/store.service.js';
+import { DB, type Db } from '../db/db.module.js';
+import { visitReports } from '../db/schema.js';
 
 @Roles('agent')
 @Controller('agent')
 export class AgentController {
-  constructor(private readonly store: StoreService) {}
+  constructor(@Inject(DB) private readonly db: Db) {}
 
   /** §8.1 — établissements dont l'agent a la charge. */
   @Get('schools')
@@ -17,23 +19,21 @@ export class AgentController {
 
   /** §8.2 — tableau de bord d'engagement d'une école. */
   @Get('schools/:name')
-  school(@Param('name') name: string) {
-    const exists = DASHBOARDS.agent.table.rows.some((r) => r[0] === name);
-    if (!exists) throw new NotFoundException('École introuvable dans votre périmètre.');
-    return { name, ...AGENT_SCHOOL, reports: this.store.visitReports.filter((r) => r.school === name) };
+  async school(@Param('name') name: string) {
+    if (!DASHBOARDS.agent.table.rows.some((r) => r[0] === name)) throw new NotFoundException('École introuvable dans votre périmètre.');
+    return { name, ...AGENT_SCHOOL, reports: await this.db.select().from(visitReports).where(eq(visitReports.school, name)).orderBy(desc(visitReports.id)) };
   }
 
   @Get('reports')
   reports() {
-    return this.store.visitReports;
+    return this.db.select().from(visitReports).orderBy(desc(visitReports.id));
   }
 
   /** §8.3 — compte-rendu de visite, visible par l'administrateur et, selon paramétrage, par l'école. */
   @Post('reports')
-  createReport(@Body({ schema: visitReportSchema }) body: z.infer<typeof visitReportSchema>) {
-    const report = { id: `v${this.store.visitReports.length + 1}`, school: body.schoolId, date: body.date, text: body.observations };
-    this.store.visitReports.unshift(report);
-    return { ...report, visibleToSchool: body.visibleToSchool };
+  async createReport(@Body({ schema: visitReportSchema }) body: z.infer<typeof visitReportSchema>) {
+    const [report] = await this.db.insert(visitReports).values({ school: body.schoolId, date: body.date, text: body.observations, visibleToSchool: body.visibleToSchool }).returning();
+    return report;
   }
 
   @Get('alerts')

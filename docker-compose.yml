@@ -1,13 +1,30 @@
 # Démarrage local complet : docker compose up --build
 #   API : http://localhost:3000/api/health      Web : http://localhost:5173
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sge
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sge}
+      POSTGRES_DB: sge
+    ports: ['5432:5432']
+    volumes: ['pgdata:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U sge -d sge']
+      interval: 5s
+      retries: 10
   api:
     build: { context: ., dockerfile: apps/api/Dockerfile }
     environment:
+      DATABASE_URL: postgres://sge:${POSTGRES_PASSWORD:-sge}@db:5432/sge
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       CORS_ORIGIN: http://localhost:5173
-      # La connexion de démonstration est coupée en NODE_ENV=production.
+      # Charge les comptes de démonstration (mot de passe motdepasse1) dans une base vide.
+      # À mettre à false pour tout environnement réel.
+      SEED_DEMO: ${SEED_DEMO:-true}
     ports: ['3000:3000']
+    depends_on:
+      db: { condition: service_healthy }
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/api/health']
       interval: 10s
@@ -21,3 +38,6 @@ services:
     ports: ['5173:3000']
     depends_on:
       api: { condition: service_healthy }
+
+volumes:
+  pgdata:

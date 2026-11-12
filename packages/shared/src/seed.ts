@@ -195,7 +195,7 @@ export const THREADS: Record<'eleve' | 'parent' | 'enseignant', ThreadSummary[]>
     { id: 'th3', initials: 'MN', name: 'Mme Nziengui', kind: 'Classe · maîtresse de Junior', last: 'Junior peut revenir demain avec un mot.', time: 'Lun.', unread: 1 },
   ],
   eleve: [
-    { id: 'th1', initials: 'ND', name: 'M. Ndong', kind: 'Privé · Mathématiques', last: 'Bien sûr, nous le reprendrons demain.', time: '09:52', unread: 1 },
+    { id: 'th9', initials: 'ND', name: 'M. Ndong', kind: 'Privé · Mathématiques', last: 'Bien sûr, nous le reprendrons demain.', time: '09:52', unread: 1 },
     { id: 'th4', initials: '', name: 'Classe 3ème B', kind: 'Classe · 38 membres', last: 'Évaluation demain sur le chapitre 3.', time: '08:10', unread: 2, icon: 'users' },
     { id: 'th5', initials: '', name: 'Vie scolaire', kind: 'École · Lycée Léon Mba', last: 'Sortie au Musée national le 27 novembre.', time: 'Lun.', unread: 0, icon: 'school' },
   ],

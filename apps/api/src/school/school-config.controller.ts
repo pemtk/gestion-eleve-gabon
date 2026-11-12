@@ -1,8 +1,11 @@
-import { Body, Controller, Get, Post, Put } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Post, Put } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
 import { classInputSchema, schoolYearSchema } from '@sge/shared';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { Roles } from '../common/auth.js';
-import { StoreService } from '../common/store.service.js';
+import { DB, type Db } from '../db/db.module.js';
+import { assignments, classes, schoolYears } from '../db/schema.js';
 import { SchoolPolicy } from './school.policy.js';
 
 const assignmentSchema = z.object({
@@ -13,51 +16,51 @@ const assignmentSchema = z.object({
 @Roles('etablissement')
 @Controller('school')
 export class SchoolConfigController {
-  constructor(private readonly store: StoreService, private readonly policy: SchoolPolicy) {}
+  constructor(@Inject(DB) private readonly db: Db, private readonly policy: SchoolPolicy) {}
 
   @Get('year')
-  year() {
-    return this.store.year;
+  async year() {
+    const [y] = await this.db.select().from(schoolYears).where(eq(schoolYears.id, 'current'));
+    return y;
   }
 
   /** §7.2 — le libellé, les dates et les trimestres (avec coefficients) ; l'année n'est visible qu'une fois activée. */
   @Put('year')
-  saveYear(@Body({ schema: schoolYearSchema }) body: z.infer<typeof schoolYearSchema>) {
-    this.policy.assertWritable();
-    this.store.year = { ...this.store.year, ...body, active: false };
-    return this.store.year;
+  async saveYear(@Body({ schema: schoolYearSchema }) body: z.infer<typeof schoolYearSchema>) {
+    await this.policy.assertWritable();
+    const [y] = await this.db.update(schoolYears).set({ ...body, active: false }).where(eq(schoolYears.id, 'current')).returning();
+    return y;
   }
 
   @Post('year/activate')
-  activate() {
-    this.policy.assertWritable();
-    this.store.year.active = true;
-    return this.store.year;
+  async activate() {
+    await this.policy.assertWritable();
+    const [y] = await this.db.update(schoolYears).set({ active: true }).where(eq(schoolYears.id, 'current')).returning();
+    return y;
   }
 
   @Get('classes')
-  classes() {
-    return this.store.classes;
+  async classes() {
+    const rows = await this.db.select().from(classes).orderBy(classes.id);
+    return rows.map(({ studentCount, ...c }) => ({ ...c, students: studentCount }));
   }
 
   @Post('classes')
-  createClass(@Body({ schema: classInputSchema }) body: z.infer<typeof classInputSchema>) {
-    this.policy.assertWritable();
-    const created = { id: `c${this.store.classes.length + 1}`, name: body.name, level: body.level, capacity: body.capacity, students: 0, completion: 0 };
-    this.store.classes.push(created);
-    return created;
+  async createClass(@Body({ schema: classInputSchema }) body: z.infer<typeof classInputSchema>) {
+    await this.policy.assertWritable();
+    const [c] = await this.db.insert(classes).values({ id: randomUUID(), name: body.name, level: body.level, capacity: body.capacity }).returning();
+    return { ...c, students: 0 };
   }
 
   @Get('assignments')
   assignments() {
-    return this.store.assignments;
+    return this.db.select().from(assignments).orderBy(assignments.id);
   }
 
   @Post('assignments')
-  assign(@Body({ schema: assignmentSchema }) body: z.infer<typeof assignmentSchema>) {
-    this.policy.assertWritable();
-    const created = { id: `a${this.store.assignments.length + 1}`, ...body };
-    this.store.assignments.push(created);
-    return created;
+  async assign(@Body({ schema: assignmentSchema }) body: z.infer<typeof assignmentSchema>) {
+    await this.policy.assertWritable();
+    const [a] = await this.db.insert(assignments).values({ id: randomUUID(), ...body }).returning();
+    return a;
   }
 }

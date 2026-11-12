@@ -1,8 +1,12 @@
-import { Body, Controller, Get, NotFoundException, Param, Patch, Post, Put } from '@nestjs/common';
+import { Body, Controller, Get, Inject, NotFoundException, Param, Patch, Post, Put } from '@nestjs/common';
+import { desc, eq, isNotNull } from 'drizzle-orm';
 import { announcementSchema, caseCloseSchema, caseEvaluationSchema, gradeCorrectionSchema, ATTENDANCE_STATUSES, JUSTIFICATIONS } from '@sge/shared';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { Roles } from '../common/auth.js';
-import { StoreService } from '../common/store.service.js';
+import { DB, type Db } from '../db/db.module.js';
+import { absences, announcements, resultCorrections, results } from '../db/schema.js';
+import { getSetting, setSetting } from '../db/settings.js';
 import { CasesService } from './cases.service.js';
 import { SchoolPolicy } from './school.policy.js';
 
@@ -13,69 +17,73 @@ const actionSchema = z.object({ label: z.string().trim().min(1), owner: z.enum([
 @Roles('etablissement')
 @Controller('school')
 export class SchoolLifeController {
-  constructor(private readonly store: StoreService, private readonly policy: SchoolPolicy, private readonly cases: CasesService) {}
+  constructor(@Inject(DB) private readonly db: Db, private readonly policy: SchoolPolicy, private readonly cases: CasesService) {}
 
   @Get('absences')
   absences() {
-    return this.store.absences;
+    return this.db.select().from(absences).orderBy(absences.id);
   }
 
   /** §7.7 — modifier un statut ou ajouter une justification. */
   @Patch('absences/:id')
-  updateAbsence(@Param('id') id: string, @Body({ schema: absenceUpdate }) body: z.infer<typeof absenceUpdate>) {
-    this.policy.assertWritable();
-    const a = this.store.absences.find((x) => x.id === id);
+  async updateAbsence(@Param('id') id: string, @Body({ schema: absenceUpdate }) body: z.infer<typeof absenceUpdate>) {
+    await this.policy.assertWritable();
+    const set: Partial<typeof absences.$inferInsert> = { status: body.status };
+    if (body.justification !== undefined) set.justification = body.justification;
+    const [a] = await this.db.update(absences).set(set).where(eq(absences.id, id)).returning();
     if (!a) throw new NotFoundException();
-    a.status = body.status;
-    if (body.justification !== undefined) a.justification = body.justification;
     return a;
   }
 
   @Get('results')
-  results() {
-    const filled = this.store.results.filter((r) => r.value !== null).map((r) => r.value as number);
+  async results() {
+    const rows = await this.db.select().from(results).orderBy(results.id);
+    const corrections = await this.db.select().from(resultCorrections).orderBy(resultCorrections.id);
+    const filled = rows.filter((r) => r.value !== null).map((r) => r.value as number);
     return {
       className: '3ème B', subject: 'Mathématiques', term: '1er trimestre', evaluation: 'Interrogation n°2',
       average: filled.length ? filled.reduce((a, b) => a + b, 0) / filled.length : null,
-      rows: this.store.results,
+      rows: rows.map((r) => ({ ...r, history: corrections.filter((c) => c.resultId === r.id).map((c) => ({ from: c.fromValue, to: c.toValue, reason: c.reason, at: c.at })) })),
     };
   }
 
-  /** §7.8 — corriger une note publiée : nouvelle valeur et motif obligatoire, visible tout de suite. */
+  /** §7.8 — corriger une note publiée : nouvelle valeur et motif obligatoire (historisés), visible tout de suite. */
   @Post('results/:id/correct')
-  correct(@Param('id') id: string, @Body({ schema: gradeCorrectionSchema }) body: z.infer<typeof gradeCorrectionSchema>) {
-    this.policy.assertWritable();
-    const r = this.store.results.find((x) => x.id === id);
-    if (!r || r.value === null) throw new NotFoundException();
-    r.history.push({ from: r.value, to: body.value, reason: body.reason, at: new Date().toISOString() });
-    r.value = body.value;
-    return r;
+  async correct(@Param('id') id: string, @Body({ schema: gradeCorrectionSchema }) body: z.infer<typeof gradeCorrectionSchema>) {
+    await this.policy.assertWritable();
+    return this.db.transaction(async (tx) => {
+      const [r] = await tx.select().from(results).where(eq(results.id, id)).for('update');
+      if (!r || r.value === null) throw new NotFoundException();
+      await tx.insert(resultCorrections).values({ resultId: id, fromValue: r.value, toValue: body.value, reason: body.reason });
+      const [updated] = await tx.update(results).set({ value: body.value }).where(eq(results.id, id)).returning();
+      return updated;
+    });
   }
 
   @Get('announcements')
-  announcements() {
-    return this.store.announcements;
+  list() {
+    return this.db.select().from(announcements).where(isNotNull(announcements.at)).orderBy(desc(announcements.at));
   }
 
   @Post('announcements')
-  announce(@Body({ schema: announcementSchema }) body: z.infer<typeof announcementSchema>) {
-    this.policy.assertWritable();
-    const created = { id: `an${this.store.announcements.length + 1}`, title: body.title ?? '', message: body.message, audience: body.audience, target: body.target, at: new Date().toISOString() };
-    this.store.announcements.unshift(created);
-    return created;
+  async announce(@Body({ schema: announcementSchema }) body: z.infer<typeof announcementSchema>) {
+    await this.policy.assertWritable();
+    const [a] = await this.db.insert(announcements).values({ id: randomUUID(), title: body.title ?? '', message: body.message, audience: body.audience, target: body.target }).returning();
+    return a;
   }
 
   /** §7.10 — sans référent confirmé, seuls les signalements « conduite / engagement » sont possibles. */
   @Get('referent')
-  referent() {
-    return { referent: this.store.referent, confidentialEnabled: !!this.store.referent?.confirmed, delays: { acknowledgeHours: 4, evaluationHours: 24 }, cases: this.cases.list() };
+  async referent() {
+    const referent = await getSetting(this.db, 'referent');
+    return { referent, confidentialEnabled: !!referent?.confirmed, delays: { acknowledgeHours: 4, evaluationHours: 24 }, cases: await this.cases.list() };
   }
 
   @Put('referent')
-  setReferent(@Body({ schema: referentSchema }) body: z.infer<typeof referentSchema>) {
-    this.policy.assertWritable();
-    this.store.referent = body;
-    return this.store.referent;
+  async setReferent(@Body({ schema: referentSchema }) body: z.infer<typeof referentSchema>) {
+    await this.policy.assertWritable();
+    await setSetting(this.db, 'referent', body);
+    return body;
   }
 
   @Get('cases/:id')

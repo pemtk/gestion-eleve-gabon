@@ -1,7 +1,11 @@
-import { Body, Controller, Put } from '@nestjs/common';
+import { Body, Controller, Inject, Put } from '@nestjs/common';
+import { eq } from 'drizzle-orm';
+import { initials } from '@sge/shared';
 import { z } from 'zod';
-import { Roles } from '../common/auth.js';
-import { StoreService } from '../common/store.service.js';
+import { CurrentUser, Roles, type AuthUser } from '../common/auth.js';
+import { DB, type Db } from '../db/db.module.js';
+import { users } from '../db/schema.js';
+import { setSetting } from '../db/settings.js';
 
 const profileSchema = z.object({
   firstName: z.string().trim().min(1), lastName: z.string().trim().min(1),
@@ -12,11 +16,13 @@ const profileSchema = z.object({
 @Roles('eleve', 'parent', 'enseignant')
 @Controller('me')
 export class AccountController {
-  constructor(private readonly store: StoreService) {}
+  constructor(@Inject(DB) private readonly db: Db) {}
 
   @Put('profile')
-  profile(@Body({ schema: profileSchema }) body: z.infer<typeof profileSchema>) {
-    this.store.photoVisibility = body.photoVisibility;
-    return { ok: true, name: `${body.firstName} ${body.lastName}`, photoVisibility: body.photoVisibility };
+  async profile(@CurrentUser() user: AuthUser, @Body({ schema: profileSchema }) body: z.infer<typeof profileSchema>) {
+    const name = `${body.firstName} ${body.lastName}`;
+    await this.db.update(users).set({ name, initials: initials(name) }).where(eq(users.id, user.sub));
+    await setSetting(this.db, 'photoVisibility', body.photoVisibility);
+    return { ok: true, name, photoVisibility: body.photoVisibility };
   }
 }

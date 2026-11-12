@@ -1,92 +1,81 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { CONFIDENTIAL_CASES, type ConfidentialCase, type caseCloseSchema, type caseEvaluationSchema } from '@sge/shared';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { and, eq, sql } from 'drizzle-orm';
+import type { caseCloseSchema, caseEvaluationSchema } from '@sge/shared';
 import type { z } from 'zod';
-import { StoreService, type CaseState } from '../common/store.service.js';
+import { DB, type Db } from '../db/db.module.js';
+import { cases } from '../db/schema.js';
 
+type CaseRow = typeof cases.$inferSelect;
 const now = () => new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+const logEntry = (event: string) => sql`${cases.log} || ${JSON.stringify([{ at: now(), event }])}::jsonb`;
+
+/** État d'un dossier tel que l'attend l'interface. */
+const toState = (c: CaseRow) => ({ id: c.id, step: c.step as 1 | 2 | 3 | 4 | 5, gravity: c.gravity ?? undefined, measures: c.measures, informDirector: c.informDirector, informFamily: c.informFamily, actions: c.actions, summary: c.summary ?? undefined, log: c.log });
+const toInfo = (c: CaseRow) => ({ id: c.id, reporter: c.reporter, className: c.className, type: c.type, received: c.received, student: c.student, text: c.text });
 
 /**
  * Traitement d'un signalement confidentiel (§11.2) :
  * accusé de réception (4 h) → première évaluation (24 h) → plan d'action → clôture avec la directrice.
+ * Chaque transition est un UPDATE conditionnel sur l'étape courante : deux clics simultanés ne la passent qu'une fois.
  */
 @Injectable()
 export class CasesService {
-  constructor(private readonly store: StoreService) {}
+  constructor(@Inject(DB) private readonly db: Db) {}
 
-  private get(id: string): CaseState {
-    const state = this.store.cases.get(id);
-    if (!state) throw new NotFoundException('Signalement introuvable.');
-    return state;
+  private async get(id: string): Promise<CaseRow> {
+    const [row] = await this.db.select().from(cases).where(eq(cases.id, id));
+    if (!row) throw new NotFoundException('Signalement introuvable.');
+    return row;
   }
 
-  list() {
-    return CONFIDENTIAL_CASES.map((c) => ({ ...c, step: this.get(c.id).step }));
+  async list() {
+    return (await this.db.select().from(cases).orderBy(cases.id)).map((c) => ({ ...toInfo(c), step: c.step }));
   }
 
-  detail(id: string): { info: ConfidentialCase; state: CaseState } {
-    const info = CONFIDENTIAL_CASES.find((c) => c.id === id);
-    if (!info) throw new NotFoundException('Signalement introuvable.');
-    return { info, state: this.get(id) };
+  async detail(id: string) {
+    const c = await this.get(id);
+    return { info: toInfo(c), state: toState(c) };
   }
 
-  private expect(state: CaseState, step: CaseState['step']) {
-    if (state.step !== step) throw new BadRequestException('Cette étape n’est pas disponible pour ce dossier.');
+  private async transition(id: string, from: number, set: Partial<typeof cases.$inferInsert>) {
+    await this.get(id);
+    const [row] = await this.db.update(cases).set(set).where(and(eq(cases.id, id), eq(cases.step, from))).returning();
+    if (!row) throw new BadRequestException('Cette étape n’est pas disponible pour ce dossier.');
+    return toState(row);
   }
 
   acknowledge(id: string) {
-    const s = this.get(id);
-    this.expect(s, 1);
-    s.step = 2;
-    s.log.push({ at: now(), event: 'Accusé de réception · l’auteur est informé' });
-    return s;
+    return this.transition(id, 1, { step: 2, log: logEntry('Accusé de réception · l’auteur est informé') as never });
   }
 
   evaluate(id: string, input: z.infer<typeof caseEvaluationSchema>) {
-    const s = this.get(id);
-    this.expect(s, 2);
-    s.gravity = input.gravity;
-    s.measures = input.measures;
-    s.informDirector = input.informDirector;
-    s.informFamily = input.informFamily;
-    s.step = 3;
-    s.log.push({
-      at: now(),
-      event: `Évaluation : gravité ${input.gravity.toLowerCase()}${input.informDirector ? ' · directrice informée' : ''}${input.informFamily ? ' · famille prévenue' : ''}`,
-    });
-    return s;
+    const event = `Évaluation : gravité ${input.gravity.toLowerCase()}${input.informDirector ? ' · directrice informée' : ''}${input.informFamily ? ' · famille prévenue' : ''}`;
+    return this.transition(id, 2, { step: 3, gravity: input.gravity, measures: input.measures, informDirector: input.informDirector, informFamily: input.informFamily, log: logEntry(event) as never });
   }
 
-  addAction(id: string, label: string, owner: string) {
-    const s = this.get(id);
-    this.expect(s, 3);
-    s.actions.push({ label, owner, due: 'sous 7 j', done: false });
-    s.log.push({ at: now(), event: `Action ajoutée : ${label}` });
-    return s;
+  async addAction(id: string, label: string, owner: string) {
+    const action = { label, owner, due: 'sous 7 j', done: false };
+    const [row] = await this.db.update(cases).set({ actions: sql`${cases.actions} || ${JSON.stringify([action])}::jsonb` as never, log: logEntry(`Action ajoutée : ${label}`) as never }).where(and(eq(cases.id, id), eq(cases.step, 3))).returning();
+    if (!row) { await this.get(id); throw new BadRequestException('Cette étape n’est pas disponible pour ce dossier.'); }
+    return toState(row);
   }
 
-  toggleAction(id: string, index: number) {
-    const s = this.get(id);
-    const action = s.actions[index];
-    if (!action) throw new NotFoundException('Action introuvable.');
-    action.done = !action.done;
-    return s;
+  async toggleAction(id: string, index: number) {
+    const c = await this.get(id);
+    if (!c.actions[index]) throw new NotFoundException('Action introuvable.');
+    const actions = c.actions.map((a, i) => (i === index ? { ...a, done: !a.done } : a));
+    const [row] = await this.db.update(cases).set({ actions }).where(eq(cases.id, id)).returning();
+    return toState(row!);
   }
 
   /** On ne peut clore un dossier sans plan d'action. */
-  toClose(id: string) {
-    const s = this.get(id);
-    this.expect(s, 3);
-    if (!s.actions.length) throw new BadRequestException('Ajoutez au moins une action avant la clôture.');
-    s.step = 4;
-    return s;
+  async toClose(id: string) {
+    const c = await this.get(id);
+    if (c.step === 3 && !c.actions.length) throw new BadRequestException('Ajoutez au moins une action avant la clôture.');
+    return this.transition(id, 3, { step: 4 });
   }
 
   close(id: string, input: z.infer<typeof caseCloseSchema>) {
-    const s = this.get(id);
-    this.expect(s, 4);
-    s.summary = input.summary;
-    s.step = 5;
-    s.log.push({ at: now(), event: 'Signalement clos avec l’accord de la directrice' });
-    return s;
+    return this.transition(id, 4, { step: 5, summary: input.summary, log: logEntry('Signalement clos avec l’accord de la directrice') as never });
   }
 }

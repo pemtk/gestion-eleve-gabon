@@ -14,8 +14,17 @@ permissions:
 
 jobs:
   backend:
-    name: Paquets partagés + API (NestJS)
+    name: Paquets partagés + API (NestJS + PostgreSQL)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: sge, POSTGRES_PASSWORD: sge, POSTGRES_DB: sge_test }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U sge -d sge_test" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://sge:sge@localhost:5432/sge_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -28,7 +37,12 @@ jobs:
         run: npm run lint -w @sge/api
       - name: Tests (paquet partagé)
         run: npm test -w @sge/shared
-      - name: Tests (API : unitaires + e2e)
+      - name: Les migrations SQL correspondent au schéma
+        run: |
+          npm run db:generate -w @sge/api
+          git diff --exit-code -- apps/api/drizzle || (echo "Schéma modifié sans migration : lancer npm run db:generate -w @sge/api" && exit 1)
+          git status --porcelain apps/api/drizzle | grep . && exit 1 || true
+      - name: Tests (API : unitaires + intégration sur PostgreSQL)
         run: npm test -w @sge/api
       - name: Build API
         run: npm run build -w @sge/api
