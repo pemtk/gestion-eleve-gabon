@@ -42,7 +42,7 @@ jobs:
           npm run db:generate -w @sge/api
           git diff --exit-code -- apps/api/drizzle || (echo "Schéma modifié sans migration : lancer npm run db:generate -w @sge/api" && exit 1)
           git status --porcelain apps/api/drizzle | grep . && exit 1 || true
-      - name: Tests (API : unitaires + intégration sur PostgreSQL)
+      - name: "Tests (API : unitaires + intégration sur PostgreSQL)"
         run: npm test -w @sge/api
       - name: Build API
         run: npm run build -w @sge/api
