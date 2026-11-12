@@ -115,7 +115,8 @@ export const JUSTIFICATIONS = ['Maladie', 'Raison familiale', 'Transport', 'Autr
 
 export const attendanceSchema = z.object({
   classId: z.string(),
-  date: z.string(),
+  /** Jour de l'appel au format ISO (AAAA-MM-JJ). */
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date invalide (AAAA-MM-JJ).'),
   entries: z.array(
     z.object({
       studentId: z.string(),

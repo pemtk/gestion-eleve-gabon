@@ -82,6 +82,13 @@ Plusieurs écoles partagent la même base ; chacune ne voit et ne modifie que se
   plusieurs écoles. Un code valide rattache tout de suite ; un code déjà utilisé deux fois crée une demande que l'école
   valide (la validation crée le rattachement). Le temps de travail vient des séances chronométrées enregistrées à chaque
   tâche terminée (`work_sessions`).
+- **Espace enseignant** : tout part de ses **affectations** (enseignant × classe × matière). Une classe qui n'y figure pas est
+  introuvable (404), même dans la même école. Les **tâches** sont publiées pour une classe et leur **avancement est propre à
+  chaque élève** (`task_completions` : en cours, terminée, à refaire, avec temps, auto-évaluation, preuve et points).
+  L'**appel** (`attendance_records`) est l'unique source des absences : la page « Absences » de l'école en est une vue.
+  Les **notes** sont des évaluations (classe × matière × trimestre × libellé) publiées par l'enseignant, visibles aussitôt
+  de l'élève et du parent ; une note publiée n'est jamais écrasée (la correction passe par l'école, avec motif, historisée).
+  Les **signalements** créent un dossier : « confidentiel » pour le référent, « conduite » visible de l'école.
 - Par utilisateur : points et série, préférences d'alerte, récompenses, notifications lues, visibilité de la photo.
 - **L'agent** ne voit que les écoles de son périmètre (`user_scopes`). Les codes parents sont uniques sur toute la plateforme.
 - Le jeu de démonstration contient **deux écoles** : Lycée Léon Mba (profils de démo) et Collège Bessieux
@@ -120,7 +127,6 @@ Production : `JWT_SECRET` (API) et `SESSION_SECRET` (web) sont **obligatoires** 
 
 - **Indicateurs** : les tableaux de bord (taux, volumes) affichent les valeurs du jeu de démonstration ; leur calcul
   à partir des données réelles (activité, présences…) reste à écrire.
-- **Tâches** : elles sont communes à une école (pas encore par classe ni par élève).
 - **Défense en profondeur** : le cloisonnement est appliqué par l'application et par des contraintes ; PostgreSQL
   *Row Level Security* (politiques sur `school_id`) pourrait s'y ajouter pour qu'un oubli de filtre soit sans effet.
 - **SMS** : `SmsGateway` journalise les messages ; brancher l'opérateur SMS (OTP, alertes, invitations).

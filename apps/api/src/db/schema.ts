@@ -1,4 +1,4 @@
-import { boolean, foreignKey, index, integer, jsonb, pgTable, primaryKey, real, serial, text, timestamp, unique, uniqueIndex } from 'drizzle-orm/pg-core';
+import { boolean, foreignKey, index, integer, jsonb, pgSequence, pgTable, primaryKey, real, serial, text, timestamp, unique, uniqueIndex } from 'drizzle-orm/pg-core';
 
 /* ============================== Comptes et sécurité ============================== */
 export const users = pgTable('users', {
@@ -75,13 +75,14 @@ export const studentParents = pgTable('student_parents', {
 
 
 export const teachers = pgTable('teachers', {
-  schoolId: text('school_id').notNull().references(() => organizations.id),
   id: text('id').primaryKey(),
+  schoolId: text('school_id').notNull().references(() => organizations.id),
+  /** Compte de l'enseignant, une fois activé. */
+  userId: text('user_id').references(() => users.id).unique(),
   name: text('name').notNull(),
   phone: text('phone').notNull(),
-  assignments: text('assignments').notNull().default(''),
   status: text('status').notNull(),
-}, (t) => [index('teachers_school_idx').on(t.schoolId)]);
+}, (t) => [index('teachers_school_idx').on(t.schoolId), unique('teachers_id_school_uq').on(t.id, t.schoolId)]);
 
 export const linkRequests = pgTable('link_requests', {
   schoolId: text('school_id').notNull().references(() => organizations.id),
@@ -106,39 +107,60 @@ export const schoolYears = pgTable('school_years', {
 });
 
 
+/** Affectation : un enseignant enseigne une matière dans une classe (de la même école, garanti par la base). */
 export const assignments = pgTable('assignments', {
-  schoolId: text('school_id').notNull().references(() => organizations.id),
   id: text('id').primaryKey(),
-  teacher: text('teacher').notNull(),
-  className: text('class_name').notNull(),
+  schoolId: text('school_id').notNull().references(() => organizations.id),
+  teacherId: text('teacher_id').notNull(),
+  classId: text('class_id').notNull(),
   subject: text('subject').notNull(),
   year: text('year').notNull(),
   principal: boolean('principal').notNull().default(false),
-});
+}, (t) => [
+  uniqueIndex('assignments_teacher_class_subject_uq').on(t.teacherId, t.classId, t.subject),
+  foreignKey({ columns: [t.teacherId, t.schoolId], foreignColumns: [teachers.id, teachers.schoolId], name: 'assignments_teacher_same_school_fk' }),
+  foreignKey({ columns: [t.classId, t.schoolId], foreignColumns: [classes.id, classes.schoolId], name: 'assignments_class_same_school_fk' }),
+]);
 
-export const absences = pgTable('absences', {
-  schoolId: text('school_id').notNull().references(() => organizations.id),
-  id: text('id').primaryKey(),
-  student: text('student').notNull(),
-  className: text('class_name').notNull(),
-  date: text('date').notNull(),
-  status: text('status').notNull(),
-  justification: text('justification'),
-}, (t) => [index('absences_school_idx').on(t.schoolId)]);
 
-export const results = pgTable('results', {
-  schoolId: text('school_id').notNull().references(() => organizations.id),
+/** Évaluation (interrogation, devoir…) donnée à une classe dans une matière et un trimestre. */
+export const evaluations = pgTable('evaluations', {
   id: text('id').primaryKey(),
-  student: text('student').notNull(),
-  value: real('value'),
+  schoolId: text('school_id').notNull().references(() => organizations.id),
+  classId: text('class_id').notNull(),
+  subject: text('subject').notNull(),
+  trimester: text('trimester').notNull(),
+  label: text('label').notNull(),
   coefficient: integer('coefficient').notNull().default(1),
-  comment: text('comment').notNull().default(''),
-  published: boolean('published').notNull().default(false),
-});
+  /** Date de l'évaluation (ISO). */
+  heldOn: text('held_on').notNull(),
+  teacherId: text('teacher_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex('evaluations_class_subject_term_label_uq').on(t.classId, t.subject, t.trimester, t.label),
+  index('evaluations_school_idx').on(t.schoolId),
+  foreignKey({ columns: [t.classId, t.schoolId], foreignColumns: [classes.id, classes.schoolId], name: 'evaluations_class_same_school_fk' }),
+]);
 
-export const resultCorrections = pgTable('result_corrections', {
+/** Note d'un élève à une évaluation (publiée dès qu'elle existe ; corrigée par l'école avec motif). */
+export const grades = pgTable('grades', {
   id: serial('id').primaryKey(),
-  resultId: text('result_id').notNull().references(() => results.id, { onDelete: 'cascade' }),
+  evaluationId: text('evaluation_id').notNull().references(() => evaluations.id, { onDelete: 'cascade' }),
+  studentId: text('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
+  value: real('value').notNull(),
+  comment: text('comment').notNull().default(''),
+}, (t) => [uniqueIndex('grades_evaluation_student_uq').on(t.evaluationId, t.studentId)]);
+
+/** Coefficient de chaque matière dans la moyenne générale (propre à l'école). */
+export const schoolSubjects = pgTable('school_subjects', {
+  schoolId: text('school_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  coefficient: integer('coefficient').notNull().default(1),
+}, (t) => [primaryKey({ columns: [t.schoolId, t.name] })]);
+
+export const gradeCorrections = pgTable('grade_corrections', {
+  id: serial('id').primaryKey(),
+  gradeId: integer('grade_id').notNull().references(() => grades.id, { onDelete: 'cascade' }),
   fromValue: real('from_value').notNull(),
   toValue: real('to_value').notNull(),
   reason: text('reason').notNull(),
@@ -152,10 +174,16 @@ export const announcements = pgTable('announcements', {
   message: text('message').notNull(),
   audience: text('audience').notNull(),
   target: text('target'),
+  /** Auteur (enseignant) et classe visée, le cas échéant. */
+  authorId: text('author_id'),
+  classId: text('class_id'),
   at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 /** Signalements confidentiels et leur avancement (accusé → évaluation → plan d'action → clôture). */
+/** Numérotation des dossiers : SC-0300, SC-0301… */
+export const caseNumberSeq = pgSequence('case_number_seq', { startWith: 300 });
+
 export const cases = pgTable('cases', {
   schoolId: text('school_id').notNull().references(() => organizations.id),
   id: text('id').primaryKey(),
@@ -164,7 +192,12 @@ export const cases = pgTable('cases', {
   type: text('type').notNull(),
   received: text('received').notNull(),
   student: text('student').notNull(),
+  studentId: text('student_id'),
+  reporterId: text('reporter_id'),
+  /** « confidentiel » : traité par le référent ; « conduite » : visible de l'école. */
+  kind: text('kind').notNull().default('confidentiel'),
   text: text('text').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   step: integer('step').notNull().default(1),
   gravity: text('gravity'),
   measures: text('measures').notNull().default(''),
@@ -177,22 +210,41 @@ export const cases = pgTable('cases', {
 
 /* ============================== Élève, parent, enseignant ============================== */
 export const tasks = pgTable('tasks', {
-  schoolId: text('school_id').notNull().references(() => organizations.id),
   id: text('id').primaryKey(),
+  schoolId: text('school_id').notNull().references(() => organizations.id),
+  /** Classe destinataire : seuls ses élèves voient la tâche. */
+  classId: text('class_id').notNull(),
+  teacherId: text('teacher_id'),
   title: text('title').notNull(),
+  description: text('description').notNull().default(''),
   subject: text('subject').notNull(),
   type: text('type').notNull(),
   due: text('due').notNull(),
-  status: text('status').notNull().default('todo'),
   estimate: text('estimate').notNull().default('—'),
+  requirePhoto: boolean('require_photo').notNull().default(false),
+  graded: boolean('graded').notNull().default(false),
   position: serial('position'),
-}, (t) => [index('tasks_school_idx').on(t.schoolId)]);
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index('tasks_school_idx').on(t.schoolId),
+  index('tasks_class_idx').on(t.classId),
+  foreignKey({ columns: [t.classId, t.schoolId], foreignColumns: [classes.id, classes.schoolId], name: 'tasks_class_same_school_fk' }),
+]);
 
-export const taskInvalidations = pgTable('task_invalidations', {
-  taskId: text('task_id').notNull(),
-  studentIndex: integer('student_index').notNull(),
-  at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [primaryKey({ columns: [t.taskId, t.studentIndex] })]);
+/** Avancement d'un élève sur une tâche : « doing », « done » ou « redo » (invalidée par l'enseignant). */
+export const taskCompletions = pgTable('task_completions', {
+  taskId: text('task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+  studentId: text('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
+  status: text('status').notNull(),
+  seconds: integer('seconds').notNull().default(0),
+  evaluation: text('evaluation'),
+  proof: boolean('proof').notNull().default(false),
+  /** Points accordés à la validation ; annulés si l'enseignant invalide. */
+  points: integer('points').notNull().default(0),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  invalidatedAt: timestamp('invalidated_at', { withTimezone: true }),
+}, (t) => [primaryKey({ columns: [t.taskId, t.studentId] })]);
+
 
 export const learner = pgTable('learner', {
   userId: text('user_id').primaryKey(),
@@ -210,15 +262,6 @@ export const workSessions = pgTable('work_sessions', {
   at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index('work_sessions_user_idx').on(t.userId, t.at)]);
 
-export const subjectGrades = pgTable('subject_grades', {
-  id: serial('id').primaryKey(),
-  /** Élève concerné. */
-  userId: text('user_id').notNull(),
-  subject: text('subject').notNull(),
-  average: real('average').notNull(),
-  coefficient: integer('coefficient').notNull(),
-  notes: jsonb('notes').$type<{ label: string; value: number; meta: string; comment: string }[]>().notNull(),
-});
 
 export const rewards = pgTable('rewards', {
   id: text('id').primaryKey(),
@@ -236,14 +279,23 @@ export const alertPrefs = pgTable('alert_prefs', {
 }, (t) => [primaryKey({ columns: [t.userId, t.id] })]);
 
 
+/** Appel : une ligne par élève, classe et jour. Source unique des absences et retards (vue de l'école comprise). */
 export const attendanceRecords = pgTable('attendance_records', {
+  id: serial('id').primaryKey(),
   schoolId: text('school_id').notNull().references(() => organizations.id),
   classId: text('class_id').notNull(),
+  studentId: text('student_id').notNull().references(() => students.id, { onDelete: 'cascade' }),
+  /** Jour de l'appel, au format ISO (AAAA-MM-JJ). */
   date: text('date').notNull(),
-  studentId: text('student_id').notNull(),
+  /** P présent, A absent, R en retard. */
   status: text('status').notNull(),
   justification: text('justification'),
-}, (t) => [primaryKey({ columns: [t.classId, t.date, t.studentId] })]);
+  takenBy: text('taken_by'),
+}, (t) => [
+  uniqueIndex('attendance_class_date_student_uq').on(t.classId, t.date, t.studentId),
+  index('attendance_school_date_idx').on(t.schoolId, t.date),
+  foreignKey({ columns: [t.classId, t.schoolId], foreignColumns: [classes.id, classes.schoolId], name: 'attendance_class_same_school_fk' }),
+]);
 
 export const threads = pgTable('threads', {
   schoolId: text('school_id').notNull().references(() => organizations.id),

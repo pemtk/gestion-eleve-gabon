@@ -1,16 +1,18 @@
-import { Body, Controller, Get, Inject, NotFoundException, Param, Patch, Post, Put } from '@nestjs/common';
-import { and, desc, eq } from 'drizzle-orm';
+import { Body, Controller, Get, Inject, NotFoundException, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import { and, desc, eq, inArray, ne } from 'drizzle-orm';
 import { announcementSchema, caseCloseSchema, caseEvaluationSchema, gradeCorrectionSchema, ATTENDANCE_STATUSES, JUSTIFICATIONS } from '@sge/shared';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { CurrentUser, Roles, schoolOf, type AuthUser } from '../common/auth.js';
 import { DB, type Db } from '../db/db.module.js';
-import { absences, announcements, resultCorrections, results } from '../db/schema.js';
+import { announcements, attendanceRecords, classes, evaluations, gradeCorrections, grades, students } from '../db/schema.js';
+import { dateLabel } from '../learning/results.js';
 import { getSetting, setSetting } from '../db/settings.js';
 import { CasesService } from './cases.service.js';
 import { SchoolPolicy } from './school.policy.js';
 
 const absenceUpdate = z.object({ status: z.enum(ATTENDANCE_STATUSES), justification: z.enum(JUSTIFICATIONS).nullable().optional() });
+const TERMS: Record<string, string> = { T1: '1er trimestre', T2: '2ème trimestre', T3: '3ème trimestre' };
 const referentSchema = z.object({ name: z.string().trim().min(1), confirmed: z.boolean() });
 const actionSchema = z.object({ label: z.string().trim().min(1), owner: z.enum(['Référente', 'Directrice', 'Prof. principal']) });
 
@@ -19,9 +21,13 @@ const actionSchema = z.object({ label: z.string().trim().min(1), owner: z.enum([
 export class SchoolLifeController {
   constructor(@Inject(DB) private readonly db: Db, private readonly policy: SchoolPolicy, private readonly cases: CasesService) {}
 
+  /** Absences et retards : vue de l'appel des enseignants (une seule source : `attendance_records`). */
   @Get('absences')
-  absences(@CurrentUser() user: AuthUser) {
-    return this.db.select().from(absences).where(eq(absences.schoolId, schoolOf(user))).orderBy(absences.id);
+  async absences(@CurrentUser() user: AuthUser) {
+    const rows = await this.db.select({ r: attendanceRecords, firstName: students.firstName, lastName: students.lastName, className: classes.name })
+      .from(attendanceRecords).innerJoin(students, eq(students.id, attendanceRecords.studentId)).innerJoin(classes, eq(classes.id, attendanceRecords.classId))
+      .where(and(eq(attendanceRecords.schoolId, schoolOf(user)), ne(attendanceRecords.status, 'P'))).orderBy(desc(attendanceRecords.date), attendanceRecords.id);
+    return rows.map(({ r, firstName, lastName, className }) => ({ id: String(r.id), studentId: r.studentId, student: `${firstName} ${lastName}`, className, date: r.date, dateLabel: dateLabel(r.date), status: r.status, justification: r.justification }));
   }
 
   /** §7.7 — modifier un statut ou ajouter une justification. */
@@ -29,23 +35,37 @@ export class SchoolLifeController {
   async updateAbsence(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body({ schema: absenceUpdate }) body: z.infer<typeof absenceUpdate>) {
     const sid = schoolOf(user);
     await this.policy.assertWritable(sid);
-    const set: Partial<typeof absences.$inferInsert> = { status: body.status };
+    if (!/^\d+$/.test(id)) throw new NotFoundException();
+    const set: Partial<typeof attendanceRecords.$inferInsert> = { status: body.status };
     if (body.justification !== undefined) set.justification = body.justification;
-    const [a] = await this.db.update(absences).set(set).where(and(eq(absences.id, id), eq(absences.schoolId, sid))).returning();
+    const [a] = await this.db.update(attendanceRecords).set(set).where(and(eq(attendanceRecords.id, Number(id)), eq(attendanceRecords.schoolId, sid))).returning();
     if (!a) throw new NotFoundException();
-    return a;
+    return { id: String(a.id), status: a.status, justification: a.justification };
   }
 
+  /**
+   * Résultats d'une évaluation (la plus récente par défaut, ou `?evaluation=`) : une ligne par élève de la classe,
+   * « non saisie » pour ceux qui n'ont pas de note.
+   */
   @Get('results')
-  async results(@CurrentUser() user: AuthUser) {
+  async results(@CurrentUser() user: AuthUser, @Query('evaluation') evaluationId?: string) {
     const sid = schoolOf(user);
-    const rows = await this.db.select().from(results).where(eq(results.schoolId, sid)).orderBy(results.id);
-    const corrections = await this.db.select({ c: resultCorrections }).from(resultCorrections).innerJoin(results, eq(results.id, resultCorrections.resultId)).where(eq(results.schoolId, sid)).orderBy(resultCorrections.id);
-    const filled = rows.filter((r) => r.value !== null).map((r) => r.value as number);
+    const all = await this.db.select({ e: evaluations, className: classes.name }).from(evaluations).innerJoin(classes, eq(classes.id, evaluations.classId)).where(eq(evaluations.schoolId, sid)).orderBy(desc(evaluations.heldOn), desc(evaluations.createdAt));
+    const list = all.map(({ e, className }) => ({ id: e.id, label: e.label, subject: e.subject, trimester: e.trimester, className }));
+    const picked = all.find(({ e }) => e.id === evaluationId) ?? all[0];
+    if (!picked) return { evaluations: list, evaluationId: null, className: '', subject: '', term: '', evaluation: '', average: null, rows: [] };
+    const { e, className } = picked;
+    const roster = await this.db.select().from(students).where(and(eq(students.schoolId, sid), eq(students.classId, e.classId))).orderBy(students.firstName, students.lastName);
+    const given = await this.db.select().from(grades).where(eq(grades.evaluationId, e.id));
+    const corrections = given.length ? await this.db.select().from(gradeCorrections).where(inArray(gradeCorrections.gradeId, given.map((g) => g.id))).orderBy(gradeCorrections.id) : [];
+    const values = given.map((g) => g.value);
     return {
-      className: '3ème B', subject: 'Mathématiques', term: '1er trimestre', evaluation: 'Interrogation n°2',
-      average: filled.length ? filled.reduce((a, b) => a + b, 0) / filled.length : null,
-      rows: rows.map((r) => ({ ...r, history: corrections.filter(({ c }) => c.resultId === r.id).map(({ c }) => ({ from: c.fromValue, to: c.toValue, reason: c.reason, at: c.at })) })),
+      evaluations: list, evaluationId: e.id, className, subject: e.subject, term: TERMS[e.trimester] ?? e.trimester, evaluation: e.label,
+      average: values.length ? values.reduce((x, y) => x + y, 0) / values.length : null,
+      rows: roster.map((st) => {
+        const g = given.find((x) => x.studentId === st.id);
+        return { id: g ? String(g.id) : null, student: `${st.firstName} ${st.lastName}`, value: g?.value ?? null, coefficient: e.coefficient, published: !!g, history: corrections.filter((c) => c.gradeId === g?.id).map((c) => ({ from: c.fromValue, to: c.toValue, reason: c.reason, at: c.at })) };
+      }),
     };
   }
 
@@ -54,12 +74,13 @@ export class SchoolLifeController {
   async correct(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body({ schema: gradeCorrectionSchema }) body: z.infer<typeof gradeCorrectionSchema>) {
     const sid = schoolOf(user);
     await this.policy.assertWritable(sid);
+    if (!/^\d+$/.test(id)) throw new NotFoundException();
     return this.db.transaction(async (tx) => {
-      const [r] = await tx.select().from(results).where(and(eq(results.id, id), eq(results.schoolId, sid))).for('update');
-      if (!r || r.value === null) throw new NotFoundException();
-      await tx.insert(resultCorrections).values({ resultId: id, fromValue: r.value, toValue: body.value, reason: body.reason });
-      const [updated] = await tx.update(results).set({ value: body.value }).where(eq(results.id, id)).returning();
-      return updated;
+      const [row] = await tx.select({ g: grades }).from(grades).innerJoin(evaluations, eq(evaluations.id, grades.evaluationId)).where(and(eq(grades.id, Number(id)), eq(evaluations.schoolId, sid))).for('update', { of: grades });
+      if (!row) throw new NotFoundException();
+      await tx.insert(gradeCorrections).values({ gradeId: row.g.id, fromValue: row.g.value, toValue: body.value, reason: body.reason });
+      const [updated] = await tx.update(grades).set({ value: body.value }).where(eq(grades.id, row.g.id)).returning();
+      return { id: String(updated!.id), value: updated!.value };
     });
   }
 
@@ -81,7 +102,7 @@ export class SchoolLifeController {
   async referent(@CurrentUser() user: AuthUser) {
     const sid = schoolOf(user);
     const referent = await getSetting(this.db, sid, 'referent');
-    return { referent, confidentialEnabled: !!referent?.confirmed, delays: { acknowledgeHours: 4, evaluationHours: 24 }, cases: await this.cases.list(sid) };
+    return { referent, confidentialEnabled: !!referent?.confirmed, delays: { acknowledgeHours: 4, evaluationHours: 24 }, cases: await this.cases.list(sid), conduct: await this.cases.conduct(sid) };
   }
 
   @Put('referent')

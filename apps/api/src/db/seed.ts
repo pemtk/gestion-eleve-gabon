@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
-  ABSENCES, ALERT_PREFS, DEMO_SCHOOL_ID, JUNIOR, THIRD_SCHOOL_ID, WEEK_MINUTES, SECOND_SCHOOL_DATA, SECOND_SCHOOL_DIRECTOR, SECOND_SCHOOL_ID, AGENT_USERS, ASSIGNMENTS, CLASSES, CONFIDENTIAL_CASES, CONVERSATION, DEMO_PASSWORD, DEMO_USERS,
+  ATTENDANCE_SEED, FOLLOW_UP, ALERT_PREFS, DEMO_SCHOOL_ID, JUNIOR, THIRD_SCHOOL_ID, WEEK_MINUTES, SECOND_SCHOOL_DATA, SECOND_SCHOOL_DIRECTOR, SECOND_SCHOOL_ID, AGENT_USERS, ASSIGNMENTS, CLASSES, CONFIDENTIAL_CASES, CONVERSATION, DEMO_PASSWORD, DEMO_USERS,
   LINK_REQUESTS, ORGANIZATIONS, REWARDS, SCHOOL_YEAR, STUDENT_START, STUDENTS, SUBJECT_GRADES, TASKS, TEACHERS,
   TECH_INCIDENTS, THREADS, VISIT_REPORTS,
 } from '@sge/shared';
@@ -10,8 +10,8 @@ import * as t from './schema.js';
 
 const TABLES = [
   t.users, t.otpCodes, t.settings, t.classes, t.students, t.studentParents, t.teachers, t.linkRequests, t.schoolYears,
-  t.assignments, t.absences, t.results, t.resultCorrections, t.announcements, t.cases, t.tasks, t.taskInvalidations,
-  t.learner, t.workSessions, t.subjectGrades, t.rewards, t.alertPrefs, t.attendanceRecords, t.threads, t.messages, t.notificationReads,
+  t.assignments, t.evaluations, t.grades, t.gradeCorrections, t.schoolSubjects, t.announcements, t.cases, t.tasks, t.taskCompletions,
+  t.learner, t.workSessions, t.rewards, t.alertPrefs, t.attendanceRecords, t.threads, t.messages, t.notificationReads,
   t.organizations, t.orgSubscriptions, t.institutionalUsers, t.incidents, t.visitReports,
 ];
 
@@ -19,11 +19,15 @@ const TABLES = [
 export async function truncateAll(db: Db) {
   const names = TABLES.map((tb) => sql.identifier((tb as unknown as { [k: symbol]: string })[Symbol.for('drizzle:Name')]!));
   await db.execute(sql`TRUNCATE ${sql.join(names, sql`, `)} RESTART IDENTITY CASCADE`);
+  await db.execute(sql`ALTER SEQUENCE case_number_seq RESTART WITH 300`);
 }
 
-const RESULT_ROWS: [string, number | null][] = [
-  ['Aïcha Ondo', 15.5], ['Brice Nzé', 12], ['Cyrielle Mba', 17], ['Daniel Obiang', null], ['Emmanuella Moussavou', 9.5], ['Fabrice Mintsa', 13],
-];
+const MONTHS: Record<string, string> = { 'oct.': '10', 'nov.': '11', 'sept.': '09', 'déc.': '12' };
+/** « 24 oct. » → 2026-10-24 */
+const isoOf = (label: string) => { const [d, m] = label.split(' '); return `2026-${MONTHS[m!] ?? '10'}-${String(d).padStart(2, '0')}`; };
+const slug = (x: string) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+/** Notes supplémentaires du « Devoir surveillé » de mathématiques (3ème B), en plus de celle d'Aïcha. */
+const DEVOIR_GRADES: [string, number][] = [['s3', 17], ['s9', 12], ['s10', 9.5], ['s11', 13]];
 
 /**
  * Charge le jeu de démonstration (le design : Lycée Léon Mba, 3ème B…).
@@ -63,16 +67,40 @@ export async function seedDemo(db: Db, opts: { onlyIfEmpty?: boolean } = {}): Pr
     // Christelle Ondo (compte parent de démonstration) est la mère d'Aïcha ; Paul, son père, n'a pas d'application.
     const parents = STUDENTS.flatMap((s) => s.parents.map((p) => ({ studentId: s.id, name: p.name, relation: p.relation, parentUserId: p.name === DEMO_USERS.parent.name ? PARENT_ID : null })));
     if (parents.length) await tx.insert(t.studentParents).values(parents);
-    await tx.insert(t.teachers).values(TEACHERS.map((x) => ({ ...x, schoolId: S })));
+    await tx.insert(t.teachers).values(TEACHERS.map((x) => ({ id: x.id, name: x.name, phone: x.phone, status: x.status, schoolId: S, userId: x.id === 't1' ? DEMO_USERS.enseignant.id : null })));
     await tx.insert(t.linkRequests).values(LINK_REQUESTS.map((r) => ({ id: r.id, schoolId: S, parent: r.parent, relation: r.relation, child: r.child, meta: r.meta })));
     await tx.insert(t.schoolYears).values({ schoolId: S, label: SCHOOL_YEAR.label, start: SCHOOL_YEAR.start, end: SCHOOL_YEAR.end, active: SCHOOL_YEAR.active, terms: SCHOOL_YEAR.terms });
     await tx.insert(t.assignments).values(ASSIGNMENTS.map((a) => ({ ...a, schoolId: S })));
-    await tx.insert(t.absences).values(ABSENCES.map((a) => ({ ...a, schoolId: a.student === 'Junior Ondo' ? THIRD_SCHOOL_ID : S })));
-    await tx.insert(t.results).values(RESULT_ROWS.map(([student, value], i) => ({ id: `res${i}`, schoolId: S, student, value, coefficient: 2, published: value !== null })));
     await tx.insert(t.cases).values(CONFIDENTIAL_CASES.map((c) => ({ id: c.id, schoolId: S, reporter: c.reporter, className: c.className, type: c.type, received: c.received, student: c.student, text: c.text })));
-    await tx.insert(t.tasks).values(TASKS.map((k) => ({ id: k.id, schoolId: S, title: k.title, subject: k.subject, type: k.type, due: k.due, status: k.status, estimate: k.estimate })));
+
+    // Tâches de la 3ème B et avancement de chaque élève.
+    await tx.insert(t.tasks).values(TASKS.map((k) => ({ id: k.id, schoolId: S, classId: '3b', teacherId: k.subject === 'Mathématiques' ? 't1' : null, title: k.title, description: k.id === 'k1' ? 'Simplifie chaque fraction, puis range-les de la plus petite à la plus grande. Écris le détail de tes calculs dans ton cahier.' : '', subject: k.subject, type: k.type, due: k.due, estimate: k.estimate, graded: k.type === 'Devoir' })));
+    const done = (taskId: string, studentId: string, minutes: number, evaluation: string | null = null, proof = false) => ({ taskId, studentId, status: 'done', seconds: minutes * 60, evaluation, proof, points: 20, completedAt: new Date() });
+    await tx.insert(t.taskCompletions).values([
+      done('k3', 's1', 15), done('k6', 's1', 20), { taskId: 'k2', studentId: 's1', status: 'doing', seconds: 0, evaluation: null, proof: false, points: 0, completedAt: null },
+    ]);
+    // Suivi de « Fractions » (k1) : un état par élève de la 3ème B (Aïcha ne l'a pas encore commencée), dans l'ordre alphabétique des prénoms.
+    const roster = ['s1', 's3', 's4', 's9', 's10', 's11', 's12', 's13'];
+    const followIndex = [3, 0, 1, 2, 4, 5, 6, 7];
+    const minutesOf = (txt: string) => parseInt(txt, 10) || 0;
+    const k1Rows = roster.flatMap((studentId, i) => {
+      const [status, time, ev, proof] = FOLLOW_UP[followIndex[i]!]!;
+      if (status === 'none') return [];
+      return [{ taskId: 'k1', studentId, status, seconds: minutesOf(time) * 60, evaluation: ev || null, proof, points: status === 'done' ? 20 : 0, completedAt: status === 'done' ? new Date() : null }];
+    });
+    if (k1Rows.length) await tx.insert(t.taskCompletions).values(k1Rows);
+    await tx.insert(t.schoolSubjects).values(SUBJECT_GRADES.map((g) => ({ schoolId: S, name: g.subject, coefficient: g.coefficient })));
+    // Évaluations de la 3ème B : les notes d'Aïcha ; le « Devoir surveillé » de maths a aussi des notes d'autres élèves.
+    for (const g of SUBJECT_GRADES) {
+      for (const n of g.notes) {
+        const evalId = `ev-${slug(g.subject)}-${slug(n.label)}`;
+        const [dateLabel, coefLabel] = n.meta.split(' · ');
+        await tx.insert(t.evaluations).values({ id: evalId, schoolId: S, classId: '3b', subject: g.subject, trimester: 'T1', label: n.label, coefficient: parseInt(coefLabel!.replace(/\D/g, ''), 10) || 1, heldOn: isoOf(dateLabel!), teacherId: g.subject === 'Mathématiques' ? 't1' : null });
+        await tx.insert(t.grades).values({ evaluationId: evalId, studentId: 's1', value: n.value, comment: n.comment });
+        if (evalId === 'ev-mathematiques-devoir-surveille') await tx.insert(t.grades).values(DEVOIR_GRADES.map(([studentId, value]) => ({ evaluationId: evalId, studentId, value })));
+      }
+    }
     await tx.insert(t.learner).values({ userId: STUDENT_ID, points: STUDENT_START.points, streak: STUDENT_START.streak, doneToday: STUDENT_START.doneToday, history: [] });
-    await tx.insert(t.subjectGrades).values(SUBJECT_GRADES.map((g) => ({ userId: STUDENT_ID, subject: g.subject, average: g.average, coefficient: g.coefficient, notes: g.notes })));
     await tx.insert(t.rewards).values(REWARDS.map((r) => ({ ...r, ownerId: PARENT_ID })));
     await tx.insert(t.alertPrefs).values(ALERT_PREFS.map((a) => ({ ...a, userId: PARENT_ID })));
     await tx.insert(t.settings).values({ schoolId: S, key: 'referent', value: { name: 'Rosine Mba', confirmed: true } });
@@ -89,8 +117,8 @@ export async function seedDemo(db: Db, opts: { onlyIfEmpty?: boolean } = {}): Pr
     await tx.insert(t.classes).values(D.classes.map((c) => ({ id: c.id, schoolId: B, name: c.name, level: c.level, capacity: c.capacity, studentCount: c.students, completion: c.completion })));
     await tx.insert(t.students).values(D.students.map((s) => ({ id: s.id, schoolId: B, firstName: s.firstName, lastName: s.lastName, classId: s.classId, phone: s.phone, code: s.code, activated: true })));
     await tx.insert(t.studentParents).values(D.students.flatMap((s) => s.parents.map(([name, relation]) => ({ studentId: s.id, name, relation }))));
-    await tx.insert(t.teachers).values({ ...D.teacher, schoolId: B });
-    await tx.insert(t.absences).values({ ...D.absence, schoolId: B });
+    await tx.insert(t.teachers).values({ id: D.teacher.id, name: D.teacher.name, phone: D.teacher.phone, status: D.teacher.status, schoolId: B });
+    await tx.insert(t.attendanceRecords).values({ ...D.absence, schoolId: B });
     await tx.insert(t.announcements).values({ ...D.announcement, schoolId: B });
     await tx.insert(t.schoolYears).values({ schoolId: B, label: SCHOOL_YEAR.label, start: SCHOOL_YEAR.start, end: SCHOOL_YEAR.end, active: true, terms: SCHOOL_YEAR.terms });
     await tx.insert(t.cases).values({ id: D.case.id, schoolId: B, reporter: D.case.reporter, className: D.case.className, type: D.case.type, received: D.case.received, student: D.case.student, text: D.case.text });
@@ -100,6 +128,9 @@ export async function seedDemo(db: Db, opts: { onlyIfEmpty?: boolean } = {}): Pr
     await tx.insert(t.students).values({ ...JUNIOR.student, schoolId: THIRD_SCHOOL_ID, phone: null, activated: false });
     await tx.insert(t.studentParents).values({ studentId: JUNIOR.student.id, name: DEMO_USERS.parent.name, relation: 'mère', parentUserId: PARENT_ID });
 
+    // Appels : tout vient de `attendance_records` (la page « Absences » de l'école en est une simple vue).
+    const attendanceSchool = (classId: string) => (classId === JUNIOR.klass.id ? THIRD_SCHOOL_ID : S);
+    await tx.insert(t.attendanceRecords).values(ATTENDANCE_SEED.map((a) => ({ ...a, schoolId: attendanceSchool(a.classId) })));
     // Temps de travail d'Aïcha sur les 7 derniers jours (une séance par jour).
     const day = 86_400_000;
     await tx.insert(t.workSessions).values(WEEK_MINUTES.map((w, i) => ({ userId: STUDENT_ID, seconds: w.minutes * 60, at: new Date(Date.now() - (6 - i) * day) })).filter((x) => x.seconds > 0));

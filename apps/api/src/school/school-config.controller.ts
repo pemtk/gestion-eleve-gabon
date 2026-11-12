@@ -5,12 +5,12 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { CurrentUser, Roles, schoolOf, type AuthUser } from '../common/auth.js';
 import { DB, type Db } from '../db/db.module.js';
-import { isUniqueViolation } from '../db/errors.js';
-import { assignments, classes, schoolYears } from '../db/schema.js';
+import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.js';
+import { assignments, classes, schoolYears, teachers } from '../db/schema.js';
 import { SchoolPolicy } from './school.policy.js';
 
 const assignmentSchema = z.object({
-  teacher: z.string().min(1), className: z.string().min(1), subject: z.string().min(1),
+  teacherId: z.string().min(1), classId: z.string().min(1), subject: z.string().trim().min(1),
   year: z.string().min(1), principal: z.boolean().default(false),
 });
 
@@ -62,16 +62,27 @@ export class SchoolConfigController {
     }
   }
 
+  /** Affectations de l'école, avec le nom de l'enseignant et de la classe. */
   @Get('assignments')
-  assignments(@CurrentUser() user: AuthUser) {
-    return this.db.select().from(assignments).where(eq(assignments.schoolId, schoolOf(user))).orderBy(assignments.id);
+  async assignments(@CurrentUser() user: AuthUser) {
+    const rows = await this.db.select({ a: assignments, teacher: teachers.name, className: classes.name }).from(assignments)
+      .innerJoin(teachers, eq(teachers.id, assignments.teacherId)).innerJoin(classes, eq(classes.id, assignments.classId))
+      .where(eq(assignments.schoolId, schoolOf(user))).orderBy(assignments.id);
+    return rows.map(({ a, teacher, className }) => ({ id: a.id, teacherId: a.teacherId, classId: a.classId, teacher, className, subject: a.subject, year: a.year, principal: a.principal }));
   }
 
+  /** §7.6 — l'enseignant et la classe doivent appartenir à l'école (la base le garantit aussi). */
   @Post('assignments')
   async assign(@CurrentUser() user: AuthUser, @Body({ schema: assignmentSchema }) body: z.infer<typeof assignmentSchema>) {
     const sid = schoolOf(user);
     await this.policy.assertWritable(sid);
-    const [a] = await this.db.insert(assignments).values({ id: randomUUID(), schoolId: sid, ...body }).returning();
-    return a;
+    try {
+      const [a] = await this.db.insert(assignments).values({ id: randomUUID(), schoolId: sid, ...body }).returning();
+      return a;
+    } catch (e) {
+      if (isForeignKeyViolation(e)) throw new NotFoundException('Enseignant ou classe introuvable dans votre établissement.');
+      if (isUniqueViolation(e)) throw new ConflictException('Cet enseignant a déjà cette matière dans cette classe.');
+      throw e;
+    }
   }
 }

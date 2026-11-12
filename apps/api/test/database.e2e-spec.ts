@@ -58,10 +58,10 @@ describe('Base de données PostgreSQL', () => {
 
   it('historise les corrections de notes', async () => {
     const t = await c.token('etablissement');
-    await c.api().post('/school/results/res0/correct').set(c.as(t)).send({ value: 16, reason: 'Erreur de saisie' }).expect(201);
-    await c.api().post('/school/results/res0/correct').set(c.as(t)).send({ value: 17, reason: 'Deuxième relecture' }).expect(201);
-    const { body } = await c.api().get('/school/results').set(c.as(t)).expect(200);
-    const row = body.rows.find((r: { id: string }) => r.id === 'res0');
+    const before = (await c.api().get('/school/results').set(c.as(t)).expect(200)).body.rows.find((r: { student: string }) => r.student === 'Aïcha Ondo');
+    await c.api().post(`/school/results/${before.id}/correct`).set(c.as(t)).send({ value: 16, reason: 'Erreur de saisie' }).expect(201);
+    await c.api().post(`/school/results/${before.id}/correct`).set(c.as(t)).send({ value: 17, reason: 'Deuxième relecture' }).expect(201);
+    const row = (await c.api().get('/school/results').set(c.as(t)).expect(200)).body.rows.find((r: { id: string }) => r.id === before.id);
     expect(row.value).toBe(17);
     expect(row.history.map((h: { from: number; to: number }) => [h.from, h.to])).toEqual([[15.5, 16], [16, 17]]);
   });

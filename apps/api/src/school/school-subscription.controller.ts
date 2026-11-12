@@ -3,9 +3,9 @@ import { Post } from '@nestjs/common';
 import { PLAN_ORDER, PLANS, planFeatureList, planHas, planLevel, planPrice, type Plan } from '@sge/shared';
 import { z } from 'zod';
 import { CurrentUser, Roles, schoolOf, type AuthUser } from '../common/auth.js';
-import { and, count, eq, isNull, lt } from 'drizzle-orm';
+import { and, count, eq, isNull, lt, ne } from 'drizzle-orm';
 import { DB, type Db } from '../db/db.module.js';
-import { absences, cases, linkRequests } from '../db/schema.js';
+import { attendanceRecords, cases, linkRequests } from '../db/schema.js';
 import { getSubscription, schoolName, setRequestedPlan } from '../db/subscription.js';
 
 /** §10.2 côté établissement : voir sa formule et demander un changement (validé par l'administrateur). */
@@ -22,8 +22,8 @@ export class SchoolSubscriptionController {
     // Pastilles de la barre latérale : calculées pour cet établissement (rattachements à valider, absences non justifiées, dossiers ouverts).
     const badges = {
       users: await n(this.db.select({ n: count() }).from(linkRequests).where(and(eq(linkRequests.schoolId, sid), isNull(linkRequests.decision)))),
-      absences: await n(this.db.select({ n: count() }).from(absences).where(and(eq(absences.schoolId, sid), isNull(absences.justification)))),
-      cases: await n(this.db.select({ n: count() }).from(cases).where(and(eq(cases.schoolId, sid), lt(cases.step, 5)))),
+      absences: await n(this.db.select({ n: count() }).from(attendanceRecords).where(and(eq(attendanceRecords.schoolId, sid), ne(attendanceRecords.status, 'P'), isNull(attendanceRecords.justification)))),
+      cases: await n(this.db.select({ n: count() }).from(cases).where(and(eq(cases.schoolId, sid), eq(cases.kind, 'confidentiel'), lt(cases.step, 5)))),
     };
     return { id: sid, name: await schoolName(this.db, sid), badges };
   }
