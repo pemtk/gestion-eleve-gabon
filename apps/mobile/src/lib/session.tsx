@@ -1,14 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'expo-router';
 import type { Role, SessionUser } from '@sge/shared';
-import { api, ApiError, NetworkError, request, setToken } from './api';
+import { api, ApiError, getRefreshToken, NetworkError, onSession, request, setTokens } from './api';
 import { local, secure } from './storage';
 
 interface QueuedAction { id: string; method: string; path: string; body?: unknown }
 interface Ctx {
   ready: boolean;
   user: SessionUser | null;
-  signIn: (token: string, user: SessionUser) => Promise<void>;
+  signIn: (token: string, refreshToken: string, user: SessionUser) => Promise<void>;
   signOut: () => Promise<void>;
   /** Mode hors ligne : réel (échec réseau) ou simulé depuis la barre d'état (démo). */
   offline: boolean;
@@ -42,23 +42,35 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     void (async () => {
       try {
-        const [t, u, q] = await Promise.all([secure.get('sge.token'), local.getItem('sge.user'), local.getItem(QUEUE_KEY)]);
-        if (t && u) { setToken(t); setUser(JSON.parse(u)); }
+        const [t, r, u, q] = await Promise.all([secure.get('sge.token'), secure.get('sge.refresh'), local.getItem('sge.user'), local.getItem(QUEUE_KEY)]);
+        if (t && r && u) { setTokens(t, r); setUser(JSON.parse(u)); }
         if (q) { queueRef.current = JSON.parse(q); setQueue(queueRef.current); }
       } finally { setReady(true); }
     })();
   }, []);
 
-  const signIn = useCallback(async (token: string, u: SessionUser) => {
-    setToken(token); setUser(u);
-    await Promise.all([secure.set('sge.token', token), local.setItem('sge.user', JSON.stringify(u))]);
+  const signIn = useCallback(async (token: string, refresh: string, u: SessionUser) => {
+    setTokens(token, refresh); setUser(u);
+    await Promise.all([secure.set('sge.token', token), secure.set('sge.refresh', refresh), local.setItem('sge.user', JSON.stringify(u))]);
   }, []);
 
-  const signOut = useCallback(async () => {
-    setToken(null); setUser(null);
-    await Promise.all([secure.del('sge.token'), local.removeItem('sge.user')]);
+  const clear = useCallback(async () => {
+    setTokens(null, null); setUser(null);
+    await Promise.all([secure.del('sge.token'), secure.del('sge.refresh'), local.removeItem('sge.user')]);
     router.replace('/login');
   }, [router]);
+
+  /** Déconnexion volontaire : le jeton de renouvellement est révoqué côté serveur (au mieux : sans réseau, il expirera seul). */
+  const signOut = useCallback(async () => {
+    const refresh = getRefreshToken();
+    if (refresh) await api.post('/auth/logout', { refreshToken: refresh }).catch(() => undefined);
+    await clear();
+  }, [clear]);
+
+  // Renouvellement silencieux : les nouveaux jetons sont gardés ; une session perdue (révoquée, expirée) renvoie à la connexion.
+  useEffect(() => {
+    onSession({ tokens: (a, r) => { void Promise.all([secure.set('sge.token', a), secure.set('sge.refresh', r)]); }, expired: () => { void clear(); } });
+  }, [clear]);
 
   const flush = useCallback(async () => {
     for (const a of [...queueRef.current]) {

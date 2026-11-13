@@ -1,6 +1,9 @@
 import { isRouteErrorResponse, Links, Meta, Outlet, Scripts, ScrollRestoration } from 'react-router';
 import type { Route } from './+types/root';
+import { renewSession } from '~/lib/renew.server';
 import './app.css';
+
+export const middleware: Route.MiddlewareFunction[] = [renewSession];
 
 export const links: Route.LinksFunction = () => [
   { rel: 'icon', type: 'image/png', href: '/favicon.png' },

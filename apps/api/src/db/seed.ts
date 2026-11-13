@@ -13,7 +13,7 @@ const TABLES = [
   t.users, t.otpCodes, t.settings, t.classes, t.students, t.studentParents, t.teachers, t.linkRequests, t.schoolYears,
   t.assignments, t.evaluations, t.grades, t.gradeCorrections, t.schoolSubjects, t.announcements, t.cases, t.tasks, t.taskCompletions,
   t.learner, t.workSessions, t.rewards, t.alertPrefs, t.attendanceRecords, t.threads, t.messages, t.notificationReads,
-  t.organizations, t.orgSubscriptions, t.institutionalUsers, t.incidents, t.visitReports,
+  t.organizations, t.orgSubscriptions, t.institutionalUsers, t.incidents, t.visitReports, t.rateLimits, t.refreshTokens, t.auditLog,
 ];
 
 /** Vide toutes les tables (tests, démonstration). */

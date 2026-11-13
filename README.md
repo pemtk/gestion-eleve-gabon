@@ -94,6 +94,28 @@ Plusieurs écoles partagent la même base ; chacune ne voit et ne modifie que se
 - Le jeu de démonstration contient **deux écoles** : Lycée Léon Mba (profils de démo) et Collège Bessieux
   (direction : `07 00 00 05` / `motdepasse1`, formule Essentiel). Les tests `apps/api/test/isolation.e2e-spec.ts` vérifient le cloisonnement.
 
+## Sécurité
+
+- **Limitation des tentatives** (stockée en base, donc valable avec plusieurs instances) : 5 mots de passe faux par numéro en
+  15 min → blocage 15 min ; 30 échecs par adresse IP ; 10 mauvais codes SMS par numéro ; 5 demandes de SMS par numéro et par heure
+  (anti « SMS pumping ») ; 5 essais de mot de passe actuel. La réponse est un `429` avec `code: RATE_LIMITED` et `retryAfterSeconds`.
+  Derrière un proxy, définir `TRUST_PROXY` (nombre de proxys, ex. `1`) pour que l'adresse IP lue soit celle du client.
+- **Sessions** : jeton d'accès de **15 minutes** (`ACCESS_TOKEN_TTL_SECONDS`) + jeton de renouvellement opaque (haché en base, rotation à
+  chaque usage, 14 jours, session limitée à 30 jours). Rejouer un jeton déjà remplacé révoque toute la session. Déconnexion
+  (`/auth/logout`, `/auth/logout-all`), changement et réinitialisation du mot de passe révoquent les jetons de renouvellement ;
+  une session révoquée cesse au plus tard à l'expiration du jeton d'accès. Le web renouvelle en silence (cookie httpOnly), le mobile
+  aussi (stockage sécurisé).
+- **En-têtes** : `helmet` (nosniff, HSTS, CSP `default-src 'none'`, pas de `X-Powered-By`…).
+- **Journal d'audit** (`audit_log`, ajout seul) : chaque lecture et chaque action sur un signalement confidentiel, y compris les
+  tentatives refusées (dossier d'une autre école, étape invalide), ainsi que les blocages de connexion et les changements de mot de
+  passe. Lecture : `GET /school/audit-log` (direction, son école) et `GET /admin/audit-log` (administrateur).
+- **Chiffrement des champs sensibles — évaluation** : non retenu pour l'instant. Les signalements confidentiels sont protégés par le
+  cloisonnement par école, les droits et le journal d'audit ; un chiffrement applicatif des colonnes (`cases.text`, `summary`…)
+  apporterait surtout une protection contre une fuite de la base ou des sauvegardes, au prix de la gestion des clés (rotation,
+  perte) et de l'impossibilité de rechercher dans ces champs. À faire d'abord : chiffrement du disque et des sauvegardes chez
+  l'hébergeur (voir #14). Si une exigence réglementaire l'impose ensuite : chiffrement AES-256-GCM par colonne avec clé en variable
+  d'environnement (ou KMS) et identifiant de clé stocké avec la valeur, pour permettre la rotation.
+
 ## Base de données
 
 PostgreSQL via [Drizzle ORM](https://orm.drizzle.team) : schéma dans `apps/api/src/db/schema.ts`,

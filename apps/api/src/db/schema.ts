@@ -24,6 +24,45 @@ export const otpCodes = pgTable('otp_codes', {
   attempts: integer('attempts').notNull().default(0),
 });
 
+/** Compteurs de limitation de débit (connexion, codes SMS) : en base pour rester valables avec plusieurs instances. */
+export const rateLimits = pgTable('rate_limits', {
+  key: text('key').primaryKey(),
+  count: integer('count').notNull().default(0),
+  windowStart: timestamp('window_start', { withTimezone: true }).notNull().defaultNow(),
+  blockedUntil: timestamp('blocked_until', { withTimezone: true }),
+});
+
+/**
+ * Jetons de renouvellement (opaques, stockés hachés). Chaque renouvellement remplace le précédent ; la réutilisation d'un jeton
+ * déjà remplacé révoque toute la famille (vol probable). Une famille expire au bout de 30 jours quoi qu'il arrive.
+ */
+export const refreshTokens = pgTable('refresh_tokens', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  familyId: text('family_id').notNull(),
+  tokenHash: text('token_hash').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  familyStartedAt: timestamp('family_started_at', { withTimezone: true }).notNull(),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  replacedBy: text('replaced_by'),
+}, (t) => [index('refresh_tokens_user_idx').on(t.userId), index('refresh_tokens_family_idx').on(t.familyId)]);
+
+/** Journal d'audit : accès et actions sensibles (signalements confidentiels, sécurité des comptes). Jamais modifié ni purgé par l'application. */
+export const auditLog = pgTable('audit_log', {
+  id: serial('id').primaryKey(),
+  at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
+  schoolId: text('school_id'),
+  action: text('action').notNull(),
+  resourceType: text('resource_type').notNull(),
+  resourceId: text('resource_id'),
+  /** « ok » ou « refuse » (ressource introuvable ou d'une autre école, droits insuffisants). */
+  outcome: text('outcome').notNull().default('ok'),
+  ip: text('ip'),
+  details: jsonb('details'),
+}, (t) => [index('audit_log_school_idx').on(t.schoolId, t.at), index('audit_log_resource_idx').on(t.resourceType, t.resourceId)]);
+
 /** Réglages clé/valeur : abonnement de l'école, référent vie scolaire, visibilité des photos. */
 /** Réglages par établissement (référent vie scolaire…). */
 export const settings = pgTable('settings', {

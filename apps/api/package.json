@@ -29,14 +29,15 @@
   "dependencies": {
     "@nestjs/common": "^12.0.1",
     "@nestjs/core": "^12.0.1",
+    "@nestjs/jwt": "^12.0.4",
     "@nestjs/platform-express": "^12.0.1",
+    "@sge/shared": "*",
+    "drizzle-orm": "^0.45.4",
+    "helmet": "^8.3.0",
+    "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "@sge/shared": "*",
-    "@nestjs/jwt": "^12.0.4",
-    "zod": "^4.0.0",
-    "drizzle-orm": "^0.45.4",
-    "pg": "^8.23.1"
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^12.0.0",
@@ -45,8 +46,10 @@
     "@nestjs/testing": "^12.0.1",
     "@types/express": "^5.0.0",
     "@types/node": "^26.6.6",
+    "@types/pg": "^8.23.1",
     "@types/supertest": "^7.0.0",
     "@vitest/coverage-v8": "^4.1.2",
+    "drizzle-kit": "^0.31.11",
     "oxlint": "^1.58.0",
     "oxlint-tsgolint": "^7.0.2001",
     "prettier": "^3.4.2",
@@ -54,8 +57,6 @@
     "supertest": "^7.0.0",
     "typescript": "^6.0.2",
     "vite": "^8.0.0",
-    "vitest": "^5.1.0",
-    "drizzle-kit": "^0.31.11",
-    "@types/pg": "^8.23.1"
+    "vitest": "^5.1.0"
   }
 }
