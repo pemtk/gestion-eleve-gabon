@@ -413,13 +413,13 @@ export const VISIT_REPORTS = [
 /* ---- Administration plateforme ---- */
 export const ORGANIZATIONS: Organization[] = [
   { id: 'o1', name: 'Diocèse de Libreville', type: 'Diocèse', plan: 'Diocésain', status: 'Actif', due: '31/08/2027' },
-  { id: 'o2', name: 'Lycée Léon Mba', type: 'École', plan: 'Standard', status: 'Actif', due: '31/12/2026', parentId: 'o1' },
+  { id: 'o2', name: 'Lycée Léon Mba', type: 'École', plan: 'Standard', status: 'Actif', due: '31/12/2026', parentId: 'o1', province: 'Estuaire', level: 'Lycée' },
   { id: 'o3', name: 'Réseau des écoles du Haut-Ogooué', type: 'Réseau', plan: 'Réseau', status: 'Actif', due: '30/06/2027' },
-  { id: 'o4', name: 'Collège de Nzeng-Ayong', type: 'École', plan: 'Essentiel', status: 'Essai · 12 j', due: '' },
-  { id: 'o5', name: 'École Akébé-Plaine', type: 'École', plan: 'Essentiel', status: 'Suspendu', due: '—' },
-  { id: 'o6', name: 'Collège Bessieux', type: 'École', plan: 'Essentiel', status: 'Actif', due: '30/06/2027', parentId: 'o1' },
-  { id: 'o7', name: 'École Saint-Michel', type: 'École', plan: 'Standard', status: 'Actif', due: '31/12/2026', parentId: 'o1' },
-  { id: 'o8', name: 'Lycée d’Owendo', type: 'École', plan: 'Standard', status: 'Actif', due: '31/12/2026' },
+  { id: 'o4', name: 'Collège de Nzeng-Ayong', type: 'École', plan: 'Essentiel', status: 'Essai · 12 j', due: '', province: 'Estuaire', level: 'Collège' },
+  { id: 'o5', name: 'École Akébé-Plaine', type: 'École', plan: 'Essentiel', status: 'Suspendu', due: '—', province: 'Estuaire', level: 'Primaire' },
+  { id: 'o6', name: 'Collège Bessieux', type: 'École', plan: 'Essentiel', status: 'Actif', due: '30/06/2027', parentId: 'o1', province: 'Estuaire', level: 'Collège' },
+  { id: 'o7', name: 'École Saint-Michel', type: 'École', plan: 'Standard', status: 'Actif', due: '31/12/2026', parentId: 'o1', province: 'Estuaire', level: 'Primaire' },
+  { id: 'o8', name: 'Lycée d’Owendo', type: 'École', plan: 'Standard', status: 'Actif', due: '31/12/2026', province: 'Estuaire', level: 'Lycée' },
 ];
 /** Prix mensuel indicatif par formule (FCFA) — l'annuel = 10 mois. */
 export const PLAN_PRICES = { Essentiel: 25000, Standard: 60000, Réseau: 140000, Diocésain: 300000 } as const;

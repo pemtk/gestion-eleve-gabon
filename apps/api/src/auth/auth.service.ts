@@ -7,7 +7,7 @@ import { AuditService } from '../audit/audit.service.js';
 import type { AuthUser } from '../common/auth.js';
 import { LIMITS, RateLimiter, type Limit } from '../common/rate-limiter.js';
 import { DB, type Db } from '../db/db.module.js';
-import { otpCodes, users } from '../db/schema.js';
+import { otpCodes, students, users } from '../db/schema.js';
 import { hashPassword, verifyPassword } from './password.js';
 import { ACCESS_TTL_SECONDS, RefreshTokens } from './refresh-tokens.service.js';
 import { SmsGateway } from './sms.gateway.js';
@@ -115,6 +115,8 @@ export class AuthService {
     await this.guarded('otp', keys, ip, () => this.consumeOtp(phone, code));
     const [record] = await this.db.update(users).set({ activated: true }).where(eq(users.phone, phone)).returning();
     if (!record) throw new UnauthorizedException('Aucun compte avec ce numéro.');
+    // La fiche élève suit l'état de son compte (indicateurs d'activation).
+    await this.db.update(students).set({ activated: true }).where(eq(students.userId, record.id));
     return this.session(toSessionUser(record));
   }
 

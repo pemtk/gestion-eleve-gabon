@@ -94,6 +94,29 @@ Plusieurs écoles partagent la même base ; chacune ne voit et ne modifie que se
 - Le jeu de démonstration contient **deux écoles** : Lycée Léon Mba (profils de démo) et Collège Bessieux
   (direction : `07 00 00 05` / `motdepasse1`, formule Essentiel). Les tests `apps/api/test/isolation.e2e-spec.ts` vérifient le cloisonnement.
 
+## Indicateurs
+
+Les tableaux de bord (école, agent, partenaire, administrateur, vue réseau) sont **calculés à partir des données** et changent avec elles
+(`apps/api/src/indicators`, `apps/api/src/dashboard`). Définitions :
+
+| Indicateur | Calcul |
+| --- | --- |
+| Élèves actifs | comptes élèves activés (code SMS saisi) / élèves de l'école |
+| Parents rattachés | élèves ayant au moins un parent rattaché / élèves |
+| Complétion des tâches | tâches terminées et non invalidées / (tâches publiées sur la période × élèves de la classe) — 7 jours (école, agent, réseau), 30 jours (partenaire) |
+| Notes saisies | notes enregistrées / (évaluations × élèves de la classe) |
+| Présence | présents et retards / appels saisis sur la période |
+| Appel | « À jour » si la dernière saisie date de 3 jours ou moins, sinon « En retard · N j » |
+| Statut d'une école (agent) | faible activation (< 50 %), puis saisie des notes en retard (< 60 %), puis engagement faible (complétion < 45 %) |
+| Revenu récurrent (admin) | abonnements actifs hors essais et suspensions ; l'annuel compte 10 mois |
+
+Sans mesure possible (aucune tâche, aucun appel), l'interface affiche « — » et non 0 %. Les pastilles de navigation comptent les vraies
+demandes de rattachement, absences non justifiées, signalements à accuser et incidents ouverts.
+Le **partenaire** ne reçoit que des agrégats par province : un taux n'est publié que s'il repose sur **au moins 10 élèves**, un nombre de
+signalements que s'il est **d'au moins 10** ; les cellules masquées restent vides dans les CSV (`/partner/export.csv`, `?dataset=provinces`).
+Province et niveau se renseignent à la création de l'école (administrateur) ou après coup (`PATCH /admin/organizations/:id`) ; une école sans
+province n'apparaît pas dans le tableau par région. La vue réseau regroupe les écoles rattachées au même diocèse ou réseau que l'école.
+
 ## Sécurité
 
 - **Limitation des tentatives** (stockée en base, donc valable avec plusieurs instances) : 5 mots de passe faux par numéro en
@@ -165,8 +188,6 @@ Production : `JWT_SECRET` (API) et `SESSION_SECRET` (web) sont **obligatoires** 
 
 ## Limites connues (à traiter avant une mise en production)
 
-- **Indicateurs** : les tableaux de bord (taux, volumes) affichent les valeurs du jeu de démonstration ; leur calcul
-  à partir des données réelles (activité, présences…) reste à écrire.
 - **Défense en profondeur** : le cloisonnement est appliqué par l'application et par des contraintes ; PostgreSQL
   *Row Level Security* (politiques sur `school_id`) pourrait s'y ajouter pour qu'un oubli de filtre soit sans effet.
 - **SMS** : `SmsGateway` journalise les messages ; brancher l'opérateur SMS (OTP, alertes, invitations).

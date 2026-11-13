@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Form } from 'react-router';
-import type { Organization } from '@sge/shared';
+import { PROVINCE_NAMES, SCHOOL_LEVELS, type Organization } from '@sge/shared';
 import { Cell, DataGrid, PageHeader } from '~/components/blocks';
 import { ActionNotice, Button, Chips, Field, Input, Section, Select } from '~/components/ui';
 import { run, spaceApi } from '~/lib/api.server';
@@ -17,7 +17,7 @@ export async function action({ request }: Route.ActionArgs) {
   const type = str(fd, 'type');
   const director = type === 'École' && str(fd, 'directorName') ? { name: str(fd, 'directorName'), phone: str(fd, 'directorPhone') } : undefined;
   return run(
-    () => api.post('/admin/organizations', { type, name: str(fd, 'name'), address: str(fd, 'address'), phone: str(fd, 'phone'), email: str(fd, 'email'), parentId: str(fd, 'parentId') || undefined, director }),
+    () => api.post('/admin/organizations', { type, name: str(fd, 'name'), address: str(fd, 'address'), phone: str(fd, 'phone'), email: str(fd, 'email'), parentId: str(fd, 'parentId') || undefined, province: type === 'École' ? str(fd, 'province') || undefined : undefined, level: type === 'École' ? str(fd, 'level') || undefined : undefined, director }),
     director ? 'Organisation créée avec 30 jours d’essai. La direction reçoit un SMS pour activer son compte.' : 'Organisation créée avec 30 jours d’essai.',
   );
 }
@@ -38,6 +38,12 @@ export default function Organizations({ loaderData: d, actionData }: Route.Compo
             <Field label="Adresse"><Input name="address" /></Field>
             <div className="grid gap-3 sm:grid-cols-2"><Field label="Téléphone"><Input name="phone" inputMode="tel" /></Field><Field label="Email"><Input name="email" type="email" /></Field></div>
             {type === 'École' && <Field label="Rattachée à" hint="Facultatif : un diocèse ou un réseau existant"><Select name="parentId"><option value="">Aucune</option>{parents.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>}
+            {type === 'École' && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Province" hint="Sert aux indicateurs par région"><Select name="province"><option value="">Non renseignée</option>{PROVINCE_NAMES.map((p) => <option key={p} value={p}>{p}</option>)}</Select></Field>
+                <Field label="Niveau"><Select name="level"><option value="">Non renseigné</option>{SCHOOL_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}</Select></Field>
+              </div>
+            )}
             {type === 'École' && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Direction — nom" hint="Reçoit un SMS d’invitation"><Input name="directorName" /></Field>

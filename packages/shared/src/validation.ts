@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PROVINCE_NAMES, SCHOOL_LEVELS } from './types.js';
 
 /** Seuil de confidentialité : une cellule de moins de 10 individus est masquée (§9.2). */
 export const PRIVACY_THRESHOLD = 10;
@@ -176,6 +177,9 @@ export const organizationSchema = z.object({
   phone: z.string().default(''),
   email: z.string().default(''),
   parentId: z.string().optional(),
+  /** Province et niveau de l'école : indicateurs par région et par niveau du partenaire. */
+  province: z.enum(PROVINCE_NAMES).optional(),
+  level: z.enum(SCHOOL_LEVELS).optional(),
   /** Direction de l'école : son compte est créé et invité par SMS. Sans objet pour un diocèse ou un réseau. */
   director: directorSchema.optional(),
 });
