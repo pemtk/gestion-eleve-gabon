@@ -4,6 +4,7 @@ import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import type { Role } from '@sge/shared';
 import { AppModule } from '../src/app.module.js';
+import { configureApp } from '../src/app.setup.js';
 import { DB, type Db } from '../src/db/db.module.js';
 import { seedDemo } from '../src/db/seed.js';
 
@@ -12,6 +13,7 @@ export async function createApp(): Promise<INestApplication<App>> {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL est requis pour les tests d’intégration (ex. postgres://sge:sge@localhost:5432/sge_test).');
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   const app = moduleRef.createNestApplication<INestApplication<App>>();
+  configureApp(app);
   await app.init();
   await seedDemo(app.get<Db>(DB));
   return app;

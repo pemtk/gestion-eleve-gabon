@@ -1,4 +1,4 @@
-import { Body, Controller, Get, NotFoundException, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Ip, NotFoundException, Param, Post } from '@nestjs/common';
 import {
   forgotSchema, loginSchema, otpVerifySchema, passwordChangeSchema, passwordSchema, passwordSetSchema, phoneSchema,
   ROLES, signupSchema, type Role,
@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { CurrentUser, Public, type AuthUser } from '../common/auth.js';
 import { AuthService } from './auth.service.js';
 
+const refreshSchema = z.object({ refreshToken: z.string().min(10) });
 const resetSchema = z.object({ phone: phoneSchema, code: z.string().regex(/^\d{6}$/), password: passwordSchema });
 
 @Controller('auth')
@@ -14,38 +15,56 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Public() @Post('login')
-  login(@Body({ schema: loginSchema }) body: z.infer<typeof loginSchema>) {
-    return this.auth.login(body);
+  login(@Body({ schema: loginSchema }) body: z.infer<typeof loginSchema>, @Ip() ip: string) {
+    return this.auth.login(body, ip);
   }
 
   @Public() @Post('otp/request')
-  requestOtp(@Body({ schema: z.object({ phone: phoneSchema }) }) body: { phone: string }) {
-    return this.auth.requestOtpIfAccount(body.phone);
+  requestOtp(@Body({ schema: z.object({ phone: phoneSchema }) }) body: { phone: string }, @Ip() ip: string) {
+    return this.auth.requestOtpIfAccount(body.phone, ip);
   }
 
   @Public() @Post('otp/verify')
-  verify(@Body({ schema: otpVerifySchema }) body: z.infer<typeof otpVerifySchema>) {
-    return this.auth.verifyOtp(body.phone, body.code);
+  verify(@Body({ schema: otpVerifySchema }) body: z.infer<typeof otpVerifySchema>, @Ip() ip: string) {
+    return this.auth.verifyOtp(body.phone, body.code, ip);
   }
 
   @Public() @Post('signup')
-  signup(@Body({ schema: signupSchema }) body: z.infer<typeof signupSchema>) {
-    return this.auth.signup(body);
+  signup(@Body({ schema: signupSchema }) body: z.infer<typeof signupSchema>, @Ip() ip: string) {
+    return this.auth.signup(body, ip);
   }
 
   @Public() @Post('password/forgot')
-  forgot(@Body({ schema: forgotSchema.pick({ phone: true }) }) body: { phone: string }) {
-    return this.auth.forgot(body.phone);
+  forgot(@Body({ schema: forgotSchema.pick({ phone: true }) }) body: { phone: string }, @Ip() ip: string) {
+    return this.auth.forgot(body.phone, ip);
   }
 
   @Public() @Post('password/reset')
-  reset(@Body({ schema: resetSchema }) body: z.infer<typeof resetSchema>) {
-    return this.auth.reset(body.phone, body.code, body.password);
+  reset(@Body({ schema: resetSchema }) body: z.infer<typeof resetSchema>, @Ip() ip: string) {
+    return this.auth.reset(body.phone, body.code, body.password, ip);
   }
 
   @Post('password/change')
-  change(@CurrentUser() user: AuthUser, @Body({ schema: passwordChangeSchema }) body: z.infer<typeof passwordChangeSchema>) {
-    return this.auth.changePassword(user.phone, body.current, body.next);
+  change(@CurrentUser() user: AuthUser, @Body({ schema: passwordChangeSchema }) body: z.infer<typeof passwordChangeSchema>, @Headers('x-refresh-token') keep: string | undefined, @Ip() ip: string) {
+    return this.auth.changePassword(user, body.current, body.next, keep, ip);
+  }
+
+  /** Renouvelle la session avec le jeton de renouvellement (rotation : l'ancien ne sert qu'une fois). */
+  @Public() @Post('refresh') @HttpCode(200)
+  renew(@Body({ schema: refreshSchema }) body: z.infer<typeof refreshSchema>, @Ip() ip: string) {
+    return this.auth.renew(body.refreshToken, ip);
+  }
+
+  /** Déconnexion de cet appareil : le jeton de renouvellement est révoqué. */
+  @Public() @Post('logout') @HttpCode(200)
+  logout(@Body({ schema: refreshSchema }) body: z.infer<typeof refreshSchema>) {
+    return this.auth.logout(body.refreshToken);
+  }
+
+  /** Déconnexion de tous les appareils. */
+  @Post('logout-all') @HttpCode(200)
+  logoutAll(@CurrentUser() user: AuthUser, @Ip() ip: string) {
+    return this.auth.logoutAll(user, ip);
   }
 
   /** Premier mot de passe d'un compte qui n'en a pas (activé par code SMS). */

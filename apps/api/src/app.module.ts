@@ -2,11 +2,15 @@ import { Global, Module } from '@nestjs/common';
 import { APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { StandardSchemaValidationPipe } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import { AuditController } from './audit/audit.controller.js';
+import { AuditService } from './audit/audit.service.js';
 import { AccountsService } from './accounts/accounts.service.js';
 import { AdminController } from './admin/admin.controller.js';
 import { AgentController } from './agent/agent.controller.js';
 import { AuthController } from './auth/auth.controller.js';
 import { AuthService } from './auth/auth.service.js';
+import { ACCESS_TTL_SECONDS, RefreshTokens } from './auth/refresh-tokens.service.js';
+import { RateLimiter } from './common/rate-limiter.js';
 import { SmsGateway } from './auth/sms.gateway.js';
 import { AuthGuard, RolesGuard } from './common/auth.js';
 import { DbModule } from './db/db.module.js';
@@ -35,15 +39,15 @@ export function jwtSecret(): string {
 
 @Global()
 @Module({
-  imports: [DbModule, JwtModule.register({ global: true, secret: jwtSecret(), signOptions: { expiresIn: '12h' } })],
+  imports: [DbModule, JwtModule.register({ global: true, secret: jwtSecret(), signOptions: { expiresIn: ACCESS_TTL_SECONDS } })],
   controllers: [
     HealthController, AuthController, DashboardController,
     SchoolUsersController, SchoolConfigController, SchoolLifeController, SchoolSubscriptionController,
     StudentController, ParentController, TeacherController, AccountController, MessagingController,
-    AgentController, PartnerController, AdminController,
+    AgentController, PartnerController, AdminController, AuditController,
   ],
   providers: [
-    AuthService, SmsGateway, AccountsService, CasesService, SchoolPolicy, PartnerService,
+    AuthService, SmsGateway, AccountsService, RateLimiter, RefreshTokens, AuditService, CasesService, SchoolPolicy, PartnerService,
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_PIPE, useValue: new StandardSchemaValidationPipe() },

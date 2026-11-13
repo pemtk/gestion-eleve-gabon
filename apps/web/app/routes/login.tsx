@@ -8,7 +8,7 @@ import { str } from '~/lib/form';
 import { createUserSession, getSession } from '~/lib/session.server';
 import type { Route } from './+types/login';
 
-type Session = { accessToken: string; user: SessionUser };
+type Session = { accessToken: string; refreshToken: string; user: SessionUser };
 const demoEnabled = () => process.env.NODE_ENV !== 'production' || process.env.DEMO_LOGIN === 'true';
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -36,7 +36,7 @@ export async function action({ request }: Route.ActionArgs) {
     if (!WEB_SPACE_OF[session.user.role]) {
       return { step: 'login' as const, phone: '', error: `Le profil ${ROLE_LABELS[session.user.role].toLowerCase()} utilise l’application mobile.` };
     }
-    return await createUserSession(session.accessToken, session.user);
+    return await createUserSession(session.accessToken, session.refreshToken, session.user);
   } catch (e) {
     if (e instanceof Response) throw e;
     if (e instanceof ApiError) return { step: intent === 'verify' ? ('otp' as const) : ('login' as const), phone: str(fd, 'phone'), error: e.message };

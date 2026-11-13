@@ -9,7 +9,7 @@ import { api, ApiError } from '@/lib/api';
 import { HOME, useSession } from '@/lib/session';
 import { C, F, R } from '@/theme';
 
-type Session = { accessToken: string; user: SessionUser };
+type Session = { accessToken: string; refreshToken: string; user: SessionUser };
 const DEMO = __DEV__ || process.env.EXPO_PUBLIC_DEMO === 'true';
 const msg = (e: unknown) => (e instanceof ApiError ? e.message : 'Connexion impossible. Vérifiez le réseau.');
 
@@ -19,7 +19,7 @@ function useFinish() {
   const router = useRouter();
   return async (s: Session): Promise<string | null> => {
     if (!HOME[s.user.role]) return `Le profil ${ROLE_LABELS[s.user.role].toLowerCase()} utilise l’application web.`;
-    await signIn(s.accessToken, s.user);
+    await signIn(s.accessToken, s.refreshToken, s.user);
     router.replace(HOME[s.user.role] as '/');
     return null;
   };

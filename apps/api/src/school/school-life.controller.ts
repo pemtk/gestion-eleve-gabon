@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, NotFoundException, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Ip, NotFoundException, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { and, desc, eq, inArray, ne } from 'drizzle-orm';
 import { announcementSchema, caseCloseSchema, caseEvaluationSchema, gradeCorrectionSchema, ATTENDANCE_STATUSES, JUSTIFICATIONS } from '@sge/shared';
 import { randomUUID } from 'node:crypto';
@@ -8,6 +8,7 @@ import { DB, type Db } from '../db/db.module.js';
 import { announcements, attendanceRecords, classes, evaluations, gradeCorrections, grades, students } from '../db/schema.js';
 import { dateLabel } from '../learning/results.js';
 import { getSetting, setSetting } from '../db/settings.js';
+import { AuditService } from '../audit/audit.service.js';
 import { CasesService } from './cases.service.js';
 import { SchoolPolicy } from './school.policy.js';
 
@@ -19,7 +20,12 @@ const actionSchema = z.object({ label: z.string().trim().min(1), owner: z.enum([
 @Roles('etablissement')
 @Controller('school')
 export class SchoolLifeController {
-  constructor(@Inject(DB) private readonly db: Db, private readonly policy: SchoolPolicy, private readonly cases: CasesService) {}
+  constructor(@Inject(DB) private readonly db: Db, private readonly policy: SchoolPolicy, private readonly cases: CasesService, private readonly audit: AuditService) {}
+
+  /** Trace l'accès (ou la tentative refusée) à un signalement confidentiel. */
+  private trace<T>(user: AuthUser, ip: string, action: string, id: string | null, fn: () => Promise<T>, details?: Record<string, unknown>) {
+    return this.audit.traced({ action, resourceType: 'case', resourceId: id, user, ip, details }, fn);
+  }
 
   /** Absences et retards : vue de l'appel des enseignants (une seule source : `attendance_records`). */
   @Get('absences')
@@ -99,52 +105,54 @@ export class SchoolLifeController {
 
   /** §7.10 — sans référent confirmé, seuls les signalements « conduite / engagement » sont possibles. */
   @Get('referent')
-  async referent(@CurrentUser() user: AuthUser) {
+  async referent(@CurrentUser() user: AuthUser, @Ip() ip: string) {
     const sid = schoolOf(user);
     const referent = await getSetting(this.db, sid, 'referent');
-    return { referent, confidentialEnabled: !!referent?.confirmed, delays: { acknowledgeHours: 4, evaluationHours: 24 }, cases: await this.cases.list(sid), conduct: await this.cases.conduct(sid) };
+    const cases = await this.trace(user, ip, 'case.list', null, () => this.cases.list(sid));
+    return { referent, confidentialEnabled: !!referent?.confirmed, delays: { acknowledgeHours: 4, evaluationHours: 24 }, cases, conduct: await this.cases.conduct(sid) };
   }
 
   @Put('referent')
-  async setReferent(@CurrentUser() user: AuthUser, @Body({ schema: referentSchema }) body: z.infer<typeof referentSchema>) {
+  async setReferent(@CurrentUser() user: AuthUser, @Body({ schema: referentSchema }) body: z.infer<typeof referentSchema>, @Ip() ip: string) {
     const sid = schoolOf(user);
     await this.policy.assertWritable(sid);
     await setSetting(this.db, sid, 'referent', body);
+    await this.audit.record({ action: 'case.referent.update', resourceType: 'setting', resourceId: 'referent', user, ip });
     return body;
   }
 
   @Get('cases/:id')
-  caseDetail(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.cases.detail(id, schoolOf(user));
+  caseDetail(@CurrentUser() user: AuthUser, @Param('id') id: string, @Ip() ip: string) {
+    return this.trace(user, ip, 'case.read', id, () => this.cases.detail(id, schoolOf(user)));
   }
 
   @Post('cases/:id/acknowledge')
-  ack(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.cases.acknowledge(id, schoolOf(user));
+  ack(@CurrentUser() user: AuthUser, @Param('id') id: string, @Ip() ip: string) {
+    return this.trace(user, ip, 'case.acknowledge', id, () => this.cases.acknowledge(id, schoolOf(user)));
   }
 
   @Post('cases/:id/evaluate')
-  evaluate(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body({ schema: caseEvaluationSchema }) body: z.infer<typeof caseEvaluationSchema>) {
-    return this.cases.evaluate(id, schoolOf(user), body);
+  evaluate(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body({ schema: caseEvaluationSchema }) body: z.infer<typeof caseEvaluationSchema>, @Ip() ip: string) {
+    return this.trace(user, ip, 'case.evaluate', id, () => this.cases.evaluate(id, schoolOf(user), body), { gravity: body.gravity });
   }
 
   @Post('cases/:id/actions')
-  addAction(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body({ schema: actionSchema }) body: z.infer<typeof actionSchema>) {
-    return this.cases.addAction(id, schoolOf(user), body.label, body.owner);
+  addAction(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body({ schema: actionSchema }) body: z.infer<typeof actionSchema>, @Ip() ip: string) {
+    return this.trace(user, ip, 'case.action.add', id, () => this.cases.addAction(id, schoolOf(user), body.label, body.owner));
   }
 
   @Post('cases/:id/actions/:index/toggle')
-  toggle(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('index') index: string) {
-    return this.cases.toggleAction(id, schoolOf(user), Number(index));
+  toggle(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('index') index: string, @Ip() ip: string) {
+    return this.trace(user, ip, 'case.action.toggle', id, () => this.cases.toggleAction(id, schoolOf(user), Number(index)), { index: Number(index) });
   }
 
   @Post('cases/:id/prepare-close')
-  prepareClose(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.cases.toClose(id, schoolOf(user));
+  prepareClose(@CurrentUser() user: AuthUser, @Param('id') id: string, @Ip() ip: string) {
+    return this.trace(user, ip, 'case.prepare_close', id, () => this.cases.toClose(id, schoolOf(user)));
   }
 
   @Post('cases/:id/close')
-  close(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body({ schema: caseCloseSchema }) body: z.infer<typeof caseCloseSchema>) {
-    return this.cases.close(id, schoolOf(user), body);
+  close(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body({ schema: caseCloseSchema }) body: z.infer<typeof caseCloseSchema>, @Ip() ip: string) {
+    return this.trace(user, ip, 'case.close', id, () => this.cases.close(id, schoolOf(user), body));
   }
 }

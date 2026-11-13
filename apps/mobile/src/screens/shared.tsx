@@ -5,7 +5,7 @@ import { Linking, Pressable, Switch, Text, TextInput, View } from 'react-native'
 import { FAQ, SUPPORT, TIPS, initials, isPasswordValid, passwordRules, type Message, type ThreadSummary } from '@sge/shared';
 import { Icon } from '@/components/icon';
 import { Avatar, B, Btn, Card, Field, H, Header, Kicker, ListRow, Loading, Muted, Rules, Screen, Seg } from '@/components/ui';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, getRefreshToken } from '@/lib/api';
 import { ROLE_PREFIX, useSession } from '@/lib/session';
 import { useApi } from '@/lib/use-api';
 import { C, F, R } from '@/theme';
@@ -184,7 +184,7 @@ export function MotDePasse() {
   const me = useApi<{ hasPassword: boolean }>('/auth/me');
   const hasPassword = me.data?.hasPassword ?? true;
   const save = async () => {
-    try { await api.post(hasPassword ? '/auth/password/change' : '/auth/password/set', hasPassword ? { current: cur, next: nw, confirm: conf } : { next: nw, confirm: conf }); router.back(); } catch (e) { setError(e instanceof ApiError ? e.message : 'Changement impossible.'); }
+    try { await api.post(hasPassword ? '/auth/password/change' : '/auth/password/set', hasPassword ? { current: cur, next: nw, confirm: conf } : { next: nw, confirm: conf }, { 'X-Refresh-Token': getRefreshToken() ?? '' }); router.back(); } catch (e) { setError(e instanceof ApiError ? e.message : 'Changement impossible.'); }
   };
   return (
     <Screen gap={16}>
