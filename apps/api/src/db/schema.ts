@@ -378,6 +378,9 @@ export const organizations = pgTable('organizations', {
   status: text('status').notNull(),
   due: text('due').notNull().default(''),
   parentId: text('parent_id'),
+  /** Province et niveau (écoles) : indicateurs par région du partenaire. */
+  province: text('province'),
+  level: text('level'),
 });
 
 export const orgSubscriptions = pgTable('org_subscriptions', {

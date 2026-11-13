@@ -48,7 +48,7 @@ export async function seedDemo(db: Db, opts: { onlyIfEmpty?: boolean } = {}): Pr
 
   await db.transaction(async (tx) => {
     // 1. Organisations d'abord : tout le reste s'y rattache.
-    await tx.insert(t.organizations).values(ORGANIZATIONS.map((o) => ({ id: o.id, name: o.name, type: o.type, plan: o.plan, status: o.status, due: o.due, parentId: o.parentId ?? null })));
+    await tx.insert(t.organizations).values(ORGANIZATIONS.map((o) => ({ id: o.id, name: o.name, type: o.type, plan: o.plan, status: o.status, due: o.due, parentId: o.parentId ?? null, province: o.province ?? null, level: o.level ?? null })));
     await tx.insert(t.orgSubscriptions).values(ORGANIZATIONS.map((o) => ({ orgId: o.id, plan: o.plan, period: 'annuelle', active: o.status !== 'Suspendu' })));
 
     // 2. Comptes : les profils scolaires sont rattachés à leur école ; agent/partenaire/admin à aucune.

@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Inject, NotFoundException, Param, Post, Put } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Inject, NotFoundException, Param, Patch, Post, Put } from '@nestjs/common';
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 import { inviteSchema, organizationSchema, subscriptionSchema, type Plan } from '@sge/shared';
 import { randomUUID } from 'node:crypto';
@@ -8,6 +8,7 @@ import { DB, type Db } from '../db/db.module.js';
 import { incidents, institutionalUsers, organizations, orgSubscriptions, userScopes } from '../db/schema.js';
 import { AccountsService } from '../accounts/accounts.service.js';
 
+const localisation = organizationSchema.pick({ province: true, level: true });
 const adminInvite = inviteSchema.extend({ role: z.enum(['agent', 'partenaire']), scopes: z.array(z.string()).min(1, 'Choisissez au moins un périmètre.') });
 
 @Roles('admin')
@@ -30,7 +31,7 @@ export class AdminController {
     if (body.director && body.type !== 'École') throw new BadRequestException('Seule une école a un compte de direction.');
     const id = randomUUID();
     const result = await this.db.transaction(async (tx) => {
-      const [org] = await tx.insert(organizations).values({ id, name: body.name, type: body.type, plan: 'Essentiel', status: 'Essai · 30 j', due: '', parentId: body.parentId ?? null }).returning();
+      const [org] = await tx.insert(organizations).values({ id, name: body.name, type: body.type, plan: 'Essentiel', status: 'Essai · 30 j', due: '', parentId: body.parentId ?? null, province: body.type === 'École' ? (body.province ?? null) : null, level: body.type === 'École' ? (body.level ?? null) : null }).returning();
       await tx.insert(orgSubscriptions).values({ orgId: id, plan: 'Essentiel', period: 'annuelle', active: true });
       // Compte de direction (rôle « établissement ») : rattaché à l'école par `school_id`, à activer par code SMS.
       const director = body.director
@@ -40,6 +41,14 @@ export class AdminController {
     });
     if (result.director) this.accounts.invite(result.director, body.name);
     return { ...result.org, director: result.director ? { id: result.director.id, name: result.director.name, phone: result.director.phone } : null };
+  }
+
+  /** Province et niveau d'une école existante (indicateurs par région du partenaire). */
+  @Patch('organizations/:id')
+  async locate(@Param('id') id: string, @Body({ schema: localisation }) body: z.infer<typeof localisation>) {
+    const [org] = await this.db.update(organizations).set({ province: body.province ?? null, level: body.level ?? null }).where(and(eq(organizations.id, id), eq(organizations.type, 'École'))).returning();
+    if (!org) throw new NotFoundException('École introuvable.');
+    return org;
   }
 
   /** §10.2 — abonnements et demandes de changement de formule venant des établissements. */

@@ -169,6 +169,11 @@ export interface TechIncident {
   actionIcon: string;
 }
 
+export const PROVINCE_NAMES = ['Estuaire', 'Haut-Ogooué', 'Ogooué-Maritime', 'Woleu-Ntem', 'Ngounié', 'Moyen-Ogooué', 'Nyanga', 'Ogooué-Ivindo', 'Ogooué-Lolo'] as const;
+export type Province = (typeof PROVINCE_NAMES)[number];
+export const SCHOOL_LEVELS = ['Primaire', 'Collège', 'Lycée'] as const;
+export type SchoolLevel = (typeof SCHOOL_LEVELS)[number];
+
 export interface Organization {
   id: string;
   name: string;
@@ -177,6 +182,9 @@ export interface Organization {
   status: string;
   due: string;
   parentId?: string;
+  /** Province (écoles) : sert aux indicateurs par région du partenaire. */
+  province?: Province;
+  level?: SchoolLevel;
 }
 
 export type { AttendanceStatus };

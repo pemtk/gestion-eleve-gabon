@@ -1,34 +1,36 @@
 import { Body, Controller, Get, Inject, NotFoundException, Param, Post } from '@nestjs/common';
 import { desc, eq, inArray } from 'drizzle-orm';
-import { AGENT_SCHOOL, DASHBOARDS, visitReportSchema } from '@sge/shared';
+import { visitReportSchema } from '@sge/shared';
 import { z } from 'zod';
 import { CurrentUser, Roles, type AuthUser } from '../common/auth.js';
 import { DB, type Db } from '../db/db.module.js';
 import { organizations, userScopes, visitReports } from '../db/schema.js';
+import { alertsOf, DashboardService } from '../dashboard/dashboard.service.js';
+import { IndicatorsService } from '../indicators/indicators.service.js';
 
 /** Un agent ne voit que les établissements de son périmètre (table `user_scopes`). */
 @Roles('agent')
 @Controller('agent')
 export class AgentController {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(@Inject(DB) private readonly db: Db, private readonly indicators: IndicatorsService, private readonly dashboards: DashboardService) {}
 
   private scope(user: AuthUser) {
     return this.db.select({ id: organizations.id, name: organizations.name }).from(userScopes).innerJoin(organizations, eq(organizations.id, userScopes.orgId)).where(eq(userScopes.userId, user.sub));
   }
 
-  /** §8.1 — établissements dont l'agent a la charge. */
+  /** §8.1 — établissements dont l'agent a la charge, avec leurs indicateurs de la semaine. */
   @Get('schools')
   async schools(@CurrentUser() user: AuthUser) {
-    const names = new Set((await this.scope(user)).map((o) => o.name));
-    return DASHBOARDS.agent.table.rows.filter((r) => names.has(r[0]!)).map(([name, active, completion, absences, status]) => ({ name, active, completion, absences, status }));
+    return this.dashboards.agentRows(await this.indicators.schools((await this.scope(user)).map((o) => o.id), 7));
   }
 
   /** §8.2 — tableau de bord d'engagement d'une école du périmètre. */
   @Get('schools/:name')
   async school(@CurrentUser() user: AuthUser, @Param('name') name: string) {
     const org = (await this.scope(user)).find((o) => o.name === name);
-    if (!org || !DASHBOARDS.agent.table.rows.some((r) => r[0] === name)) throw new NotFoundException('École introuvable dans votre périmètre.');
-    return { name, ...AGENT_SCHOOL, reports: await this.db.select().from(visitReports).where(eq(visitReports.schoolId, org.id)).orderBy(desc(visitReports.id)) };
+    if (!org) throw new NotFoundException('École introuvable dans votre périmètre.');
+    const [stat] = await this.indicators.schools([org.id], 7);
+    return { name, ...(await this.dashboards.agentSchool(stat!)), reports: await this.db.select().from(visitReports).where(eq(visitReports.schoolId, org.id)).orderBy(desc(visitReports.id)) };
   }
 
   @Get('reports')
@@ -47,8 +49,10 @@ export class AgentController {
     return report;
   }
 
+  /** Points d'attention de tout le périmètre (engagement, saisie des notes, activation, signalements). */
   @Get('alerts')
-  alerts() {
-    return AGENT_SCHOOL.alerts;
+  async alerts(@CurrentUser() user: AuthUser) {
+    const stats = await this.indicators.schools((await this.scope(user)).map((o) => o.id), 7);
+    return stats.flatMap((s) => alertsOf(s).map((a) => ({ icon: a.icon, text: `${s.name} · ${a.title} : ${a.text}` })));
   }
 }
