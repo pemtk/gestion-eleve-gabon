@@ -21,7 +21,6 @@ import {
   ORGANIZATIONS,
   REWARDS,
   SCHOOL_YEAR,
-  STUDENT_START,
   STUDENTS,
   SUBJECT_GRADES,
   TASKS,
@@ -53,7 +52,7 @@ const TABLES = [
   t.cases,
   t.tasks,
   t.taskCompletions,
-  t.learner,
+  t.badgeAwards,
   t.workSessions,
   t.rewards,
   t.alertPrefs,
@@ -450,13 +449,6 @@ export async function seedDemo(
           );
       }
     }
-    await tx.insert(t.learner).values({
-      userId: STUDENT_ID,
-      points: STUDENT_START.points,
-      streak: STUDENT_START.streak,
-      doneToday: STUDENT_START.doneToday,
-      history: [],
-    });
     await tx
       .insert(t.rewards)
       .values(REWARDS.map((r) => ({ ...r, ownerId: PARENT_ID })));

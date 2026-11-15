@@ -1,5 +1,6 @@
 import { Text, View } from 'react-native';
-import { formatInt, type BadgeLike } from '@/lib/format';
+import type { Badge } from '@sge/shared';
+import { formatInt } from '@/lib/format';
 import { Icon } from '@/components/icon';
 import {
   B,
@@ -20,7 +21,7 @@ export function TrophiesScreen() {
   const { data: d, error } = useApi<{
     points: number;
     streak: number;
-    badges: { icon: string; label: string; earned: boolean }[];
+    badges: Badge[];
     history: { label: string; when: string; points: string }[];
   }>('/me/student/trophies');
   if (!d) return <Loading error={error} />;
@@ -43,10 +44,11 @@ export function TrophiesScreen() {
       </View>
       <SectionTitle title="Badges" />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 }}>
-        {d.badges.map((b: BadgeLike) => (
+        {d.badges.map((b) => (
           <View
-            key={b.label}
-            style={{ width: '33.33%', alignItems: 'center', gap: 7, opacity: b.earned ? 1 : 0.4 }}
+            key={b.id}
+            accessibilityLabel={`${b.label} : ${b.earned ? 'obtenu' : `${b.progress.value} sur ${b.progress.target}`}. ${b.description}`}
+            style={{ width: '33.33%', alignItems: 'center', gap: 7, opacity: b.earned ? 1 : 0.5 }}
           >
             <View
               style={{
@@ -65,6 +67,9 @@ export function TrophiesScreen() {
             <B size={12} style={{ textAlign: 'center' }}>
               {b.label}
             </B>
+            <Muted size={11} style={{ textAlign: 'center' }}>
+              {b.earned ? 'Obtenu' : `${b.progress.value} / ${b.progress.target}`}
+            </Muted>
           </View>
         ))}
       </View>

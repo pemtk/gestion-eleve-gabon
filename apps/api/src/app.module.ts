@@ -24,6 +24,7 @@ import { DbModule } from './db/db.module.js';
 import { DashboardController } from './dashboard/dashboard.controller.js';
 import { HealthController } from './health.controller.js';
 import { AccountController } from './learning/account.controller.js';
+import { GamificationService } from './learning/gamification.service.js';
 import { StudentController } from './learning/student.controller.js';
 import { TeacherRosterService } from './learning/teacher/teacher-roster.service.js';
 import { TeacherClassesController } from './learning/teacher/teacher-classes.controller.js';
@@ -132,6 +133,7 @@ export function jwtSecret(): string {
     FilesController,
   ],
   providers: [
+    GamificationService,
     UserLookupService,
     AuthThrottleService,
     OtpService,

@@ -57,6 +57,13 @@
       "when": 1794729449528,
       "tag": "0007_messagerie",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794736457517,
+      "tag": "0008_short_silver_samurai",
+      "breakpoints": true
     }
   ]
 }

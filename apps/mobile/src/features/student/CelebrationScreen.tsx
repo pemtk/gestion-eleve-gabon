@@ -11,6 +11,7 @@ export function CelebrationScreen() {
     gained: string;
     points: string;
     streak: string;
+    badges?: string;
     queued?: string;
     note?: string;
   }>();
@@ -52,6 +53,17 @@ export function CelebrationScreen() {
               <Muted size={12}>de série</Muted>
             </Card>
           </View>
+        ) : null}
+        {p.badges ? (
+          <Card tint style={{ width: '100%', gap: 6 }}>
+            <Muted size={12}>Nouveau badge</Muted>
+            {p.badges.split('|').map((label) => (
+              <View key={label} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Icon name="award" size={20} color={C.a[700]} />
+                <B>{label}</B>
+              </View>
+            ))}
+          </Card>
         ) : null}
         <Btn label="Retour à l’accueil" onPress={() => router.replace('/eleve')} />
       </View>

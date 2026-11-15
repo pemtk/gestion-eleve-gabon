@@ -1,3 +1,4 @@
+import { POINTS_PER_TASK } from '@sge/shared';
 import {
   BadRequestException,
   Body,
@@ -8,7 +9,7 @@ import {
   Param,
   Post,
 } from '@nestjs/common';
-import { and, count, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, count, desc, eq, inArray } from 'drizzle-orm';
 import { initials, taskInputSchema } from '@sge/shared';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -20,7 +21,6 @@ import {
 } from '../../common/auth.js';
 import { DB, type Db } from '../../db/db.module.js';
 import {
-  learner,
   studentParents,
   students,
   taskCompletions,
@@ -28,8 +28,6 @@ import {
 } from '../../db/schema.js';
 import { assertTeaches, teacherClasses } from '../context.js';
 import { TeacherRosterService } from './teacher-roster.service.js';
-
-const POINTS_PER_TASK = 20;
 
 /** Tâches publiées, suivi élève par élève et invalidation (§6.2, §6.3). */
 @Roles('enseignant')
@@ -204,15 +202,6 @@ export class TeacherTasksController {
             eq(taskCompletions.studentId, studentId),
           ),
         );
-      const [s] = await tx
-        .select({ userId: students.userId })
-        .from(students)
-        .where(eq(students.id, studentId));
-      if (s?.userId && c.points)
-        await tx
-          .update(learner)
-          .set({ points: sql`greatest(${learner.points} - ${c.points}, 0)` })
-          .where(eq(learner.userId, s.userId));
       return {
         invalidated: true,
         pointsCancelled: c.points || POINTS_PER_TASK,

@@ -166,7 +166,8 @@ describe('API (e2e, PostgreSQL)', () => {
       .expect(201);
     expect(done.body).toMatchObject({
       gained: 20,
-      points: 1260,
+      points: 60, // 2 tâches du jeu de démonstration (40) + celle-ci
+      streak: 1,
       flaggedForReview: true,
     });
     await api_()

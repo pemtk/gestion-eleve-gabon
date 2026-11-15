@@ -28,17 +28,24 @@ export function SelfEvaluationScreen() {
           'Pas de réseau : la photo ne peut pas être envoyée maintenant. Retire-la pour valider, ou réessaie avec du réseau.',
         );
       const proofFileId = photo ? await uploadPhoto('proof', photo) : undefined;
-      const res = await send<{ gained: number; points: number; streak: number; message: string }>(
-        'POST',
-        `/me/student/tasks/${id}/complete`,
-        { evaluation: choice, proofFileId, seconds: Number(sec) },
-      );
+      const res = await send<{
+        gained: number;
+        points: number;
+        streak: number;
+        message: string;
+        newBadges: { id: string; label: string }[];
+      }>('POST', `/me/student/tasks/${id}/complete`, {
+        evaluation: choice,
+        proofFileId,
+        seconds: Number(sec),
+      });
       router.replace({
         pathname: '/eleve/bravo',
         params: {
           gained: String(res.data?.gained ?? 20),
           points: String(res.data?.points ?? ''),
           streak: String(res.data?.streak ?? ''),
+          badges: (res.data?.newBadges ?? []).map((b) => b.label).join('|'),
           queued: res.queued ? '1' : '',
           note: res.data?.message ?? '',
         },

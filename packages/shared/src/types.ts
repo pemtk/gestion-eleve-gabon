@@ -165,10 +165,16 @@ export interface Reward {
   threshold: number;
 }
 
+/** Badge de l'élève : obtenu (avec sa date) ou en cours (avec sa progression). */
 export interface Badge {
+  id: string;
   icon: string;
   label: string;
+  description: string;
   earned: boolean;
+  /** Date d'obtention (ISO) ; absente tant que le badge n'est pas obtenu. */
+  earnedAt?: string;
+  progress: { value: number; target: number };
 }
 
 export interface ConfidentialCase {

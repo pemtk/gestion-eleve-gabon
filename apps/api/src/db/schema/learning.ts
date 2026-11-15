@@ -3,7 +3,6 @@ import {
   foreignKey,
   index,
   integer,
-  jsonb,
   pgTable,
   primaryKey,
   serial,
@@ -73,16 +72,23 @@ export const taskCompletions = pgTable(
   (t) => [primaryKey({ columns: [t.taskId, t.studentId] })],
 );
 
-export const learner = pgTable('learner', {
-  userId: text('user_id').primaryKey(),
-  points: integer('points').notNull(),
-  streak: integer('streak').notNull(),
-  doneToday: integer('done_today').notNull(),
-  history: jsonb('history')
-    .$type<{ label: string; when: string; points: string }[]>()
-    .notNull()
-    .default([]),
-});
+/** Badges obtenus par un élève (la date d'obtention est conservée même si la série est rompue ensuite). */
+export const badgeAwards = pgTable(
+  'badge_awards',
+  {
+    studentId: text('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'cascade' }),
+    schoolId: text('school_id')
+      .notNull()
+      .references(() => organizations.id),
+    badgeId: text('badge_id').notNull(),
+    earnedAt: timestamp('earned_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.studentId, t.badgeId] })],
+);
 
 /** Temps de travail réel d'un élève (secondes chronométrées sur une tâche terminée). */
 export const workSessions = pgTable(

@@ -46,15 +46,15 @@ describe('Enfants du parent (PostgreSQL)', () => {
     expect(d.stats.map((s: { value: string }) => s.value)).toEqual([
       '2',
       '4',
-      '5 j',
-      '1240',
+      '1 j',
+      '40',
     ]); // faites aujourd'hui, à faire, série, points
     expect(d.week).toHaveLength(7);
     expect(
       d.week.reduce((n: number, w: { minutes: number }) => n + w.minutes, 0),
     ).toBe(340); // 5 h 40 de séances enregistrées
     expect(d.weekTotalLabel).toBe('5 h 40');
-    expect(d.reward).toMatchObject({ label: 'Sortie au parc', left: 260 });
+    expect(d.reward).toMatchObject({ label: 'Un nouveau livre', left: 960 });
     expect(d.lastGrades).toHaveLength(2);
   });
 
@@ -69,13 +69,13 @@ describe('Enfants du parent (PostgreSQL)', () => {
     expect(d.stats.map((s: { value: string }) => s.value)).toEqual([
       '3',
       '3',
-      '5 j',
-      '1260',
+      '1 j',
+      '60',
     ]);
     expect(
       d.week.reduce((n: number, w: { minutes: number }) => n + w.minutes, 0),
     ).toBe(360);
-    expect(d.reward.left).toBe(240);
+    expect(d.reward.left).toBe(940);
   });
 
   it('un parent ne voit jamais les enfants d’un autre parent', async () => {
@@ -181,12 +181,12 @@ describe('Enfants du parent (PostgreSQL)', () => {
     const junior = (
       await get('/me/parent/rewards/sm-junior', parent).expect(200)
     ).body;
-    expect(aicha).toMatchObject({ child: 'Aïcha', points: 1240 });
-    expect(
-      aicha.rewards.find(
-        (r: { label: string }) => r.label === 'Un nouveau livre',
-      ).reached,
-    ).toBe(true);
+    expect(aicha).toMatchObject({ child: 'Aïcha', points: 40 });
+    const book = aicha.rewards.find(
+      (r: { label: string }) => r.label === 'Un nouveau livre',
+    );
+    expect(book.reached).toBe(false);
+    expect(book.left).toBeGreaterThan(0);
     expect(junior).toMatchObject({ child: 'Junior', points: 0 });
     expect(junior.rewards.every((r: { reached: boolean }) => !r.reached)).toBe(
       true,

@@ -14,7 +14,7 @@ import { z } from 'zod';
 import { CurrentUser, Roles, type AuthUser } from '../../common/auth.js';
 import { DB, type Db } from '../../db/db.module.js';
 import { rewards } from '../../db/schema.js';
-import { getLearner } from '../learner.js';
+import { GamificationService } from '../gamification.service.js';
 import { ParentChildrenService } from './parent-children.service.js';
 
 /** Récompenses fixées par le parent, avec le seuil de points (§5.6). */
@@ -24,6 +24,7 @@ export class ParentRewardsController {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly family: ParentChildrenService,
+    private readonly gamification: GamificationService,
   ) {}
 
   /** Récompenses du parent ; les points sont ceux de l'enfant choisi (`?child=`), par défaut le premier. */
@@ -44,9 +45,7 @@ export class ParentRewardsController {
     const kids = await this.family.kids(user.sub);
     const kid = childId ? kids.find((k) => k.s.id === childId) : kids[0];
     if (childId && !kid) throw new NotFoundException('Enfant introuvable.');
-    const points = kid?.s.userId
-      ? (await getLearner(this.db, kid.s.userId)).points
-      : 0;
+    const points = kid ? (await this.gamification.stats(kid.s.id)).points : 0;
     const rows = await this.db
       .select()
       .from(rewards)
