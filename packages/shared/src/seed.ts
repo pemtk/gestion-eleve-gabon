@@ -712,6 +712,14 @@ export const SUPPORT = { email: 'support@gestioneleves.ga', priorityLine: '+241 
 
 /* ---- Espaces web : navigation par profil ---- */
 export const WEB_NAV: Record<WebSpace, NavItem[]> = {
+  enseignant: [
+    { icon: 'layout-dashboard', label: 'Accueil', to: '/enseignant' },
+    { icon: 'school', label: 'Mes classes', to: '/enseignant/classes' },
+    { icon: 'list-checks', label: 'Tâches', to: '/enseignant/taches' },
+    { icon: 'award', label: 'Notes', to: '/enseignant/notes' },
+    { icon: 'calendar-check', label: 'Appel', to: '/enseignant/appel' },
+    { icon: 'megaphone', label: 'Annonces', to: '/enseignant/annonces' },
+  ],
   ecole: [
     { icon: 'layout-dashboard', label: 'Tableau de bord', to: '/ecole' },
     { icon: 'users', label: 'Utilisateurs', to: '/ecole/utilisateurs' },
@@ -749,7 +757,8 @@ export const WEB_NAV: Record<WebSpace, NavItem[]> = {
 /* ---- Tableaux de bord par espace ---- */
 const bar = (label: string, pct: number, display?: string): BarRow => ({ label, pct, display });
 
-export const DASHBOARDS: Record<WebSpace, DashboardData> = {
+/** Tableaux de bord statiques des espaces institutionnels (l'enseignant a le sien, calculé par `/me/teacher/home`). */
+export const DASHBOARDS: Record<Exclude<WebSpace, 'enseignant'>, DashboardData> = {
   ecole: {
     head: {
       kicker: 'Lycée Léon Mba · Libreville · année 2026–2027',

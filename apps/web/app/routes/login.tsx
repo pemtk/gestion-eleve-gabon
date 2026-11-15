@@ -96,12 +96,12 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
             <span className="italic">sans papier.</span>
           </h1>
           <p className="mt-5 max-w-md text-[15px] leading-relaxed text-neutral-700">
-            Établissements, agents, partenaires et équipe plateforme suivent l’engagement des
-            élèves, les absences et les résultats au même endroit.
+            Enseignants, établissements, agents, partenaires et équipe plateforme suivent
+            l’engagement des élèves, les absences et les résultats au même endroit.
           </p>
         </div>
         <p className="text-[12px] text-neutral-600">
-          Les élèves, parents et enseignants utilisent l’application mobile.
+          Les élèves et les parents utilisent l’application mobile.
         </p>
       </div>
 
