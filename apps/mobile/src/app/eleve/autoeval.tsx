@@ -1,1 +1,1 @@
-export { AutoEval as default } from '@/screens/eleve';
+export { SelfEvaluationScreen as default } from '@/features/student';

@@ -1,1 +1,1 @@
-export { Home as default } from '@/screens/eleve';
+export { HomeScreen as default } from '@/features/student';

@@ -1,1 +1,1 @@
-export { Resultats as default } from '@/screens/eleve';
+export { ResultsScreen as default } from '@/features/student';

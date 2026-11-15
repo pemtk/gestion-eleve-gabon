@@ -1,1 +1,1 @@
-export { Ajouter as default } from '@/screens/parent';
+export { AddChildScreen as default } from '@/features/parent';

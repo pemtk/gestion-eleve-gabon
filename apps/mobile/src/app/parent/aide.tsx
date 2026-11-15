@@ -1,1 +1,1 @@
-export { Aide as default } from '@/screens/shared';
+export { HelpScreen as default } from '@/features/account';

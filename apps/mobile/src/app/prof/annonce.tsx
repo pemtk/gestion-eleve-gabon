@@ -1,1 +1,1 @@
-export { Annonce as default } from '@/screens/prof';
+export { AnnouncementScreen as default } from '@/features/teacher';

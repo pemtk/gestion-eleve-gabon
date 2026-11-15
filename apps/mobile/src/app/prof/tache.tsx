@@ -1,1 +1,1 @@
-export { NouvelleTache as default } from '@/screens/prof';
+export { NewTaskScreen as default } from '@/features/teacher';

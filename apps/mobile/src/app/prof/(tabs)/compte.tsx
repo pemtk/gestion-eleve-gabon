@@ -1,1 +1,1 @@
-export { Compte as default } from '@/screens/shared';
+export { AccountScreen as default } from '@/features/account';

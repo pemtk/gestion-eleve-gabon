@@ -1,1 +1,1 @@
-export { Suivi as default } from '@/screens/prof';
+export { FollowUpScreen as default } from '@/features/teacher';
