@@ -253,9 +253,15 @@ describe('Indicateurs calculés (PostgreSQL)', () => {
     });
 
     it('la liste des classes donne la complétion mesurée, pas la valeur figée de la démonstration', async () => {
-      const rows = (await get('/school/classes', ecole).expect(200)).body as { id: string; completion: number | null; alert?: unknown }[];
+      const rows = (await get('/school/classes', ecole).expect(200)).body as {
+        id: string;
+        completion: number | null;
+        alert?: unknown;
+      }[];
       const dashboard = await dash('ecole', ecole);
-      expect(rows.find((r) => r.id === '3b')?.completion).toBe(dashboard.chart.rows.find((r) => r.label === '3ème B')?.pct);
+      expect(rows.find((r) => r.id === '3b')?.completion).toBe(
+        dashboard.chart.rows.find((r) => r.label === '3ème B')?.pct,
+      );
       expect(rows.find((r) => r.id === 'ta')?.completion).toBeNull(); // Terminale A : aucune tâche, donc rien à mesurer (et non 82 %)
       expect(rows.every((r) => !('alert' in r))).toBe(true);
     });
