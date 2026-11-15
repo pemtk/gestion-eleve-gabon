@@ -131,7 +131,7 @@ export class TeacherController {
       const c = done.find((x) => x.studentId === s.id);
       const status = c?.status === 'done' || c?.status === 'doing' || c?.status === 'redo' ? c.status : 'none';
       const time = status === 'redo' ? 'points annulés' : status === 'none' || !c?.seconds ? '—' : `${Math.max(1, Math.round(c.seconds / 60))} min`;
-      return { studentId: s.id, name: `${s.firstName} ${s.lastName}`, initials: initials(`${s.firstName} ${s.lastName}`), status, time, evaluation: status === 'done' ? (c?.evaluation ?? '') : '', proof: status === 'done' && !!c?.proof };
+      return { studentId: s.id, name: `${s.firstName} ${s.lastName}`, initials: initials(`${s.firstName} ${s.lastName}`), status, time, evaluation: status === 'done' ? (c?.evaluation ?? '') : '', proof: status === 'done' && !!c?.proof, proofFileId: status === 'done' ? (c?.proofFileId ?? null) : null };
     });
     return { task: { id: t.id, title: t.title, due: t.due, className: cls.className }, rows, doubts: rows.filter((r) => r.evaluation === 'doubt').length };
   }

@@ -4,7 +4,10 @@ import { settings } from './schema.js';
 
 export interface ReferentSetting { name: string; confirmed: boolean }
 
-const DEFAULTS = { referent: null as ReferentSetting | null };
+/** §11.3 — les photos de preuve ne sont vues du parent que si l'école l'autorise. */
+export interface PhotoSetting { proofVisibleToParents: boolean }
+
+const DEFAULTS = { referent: null as ReferentSetting | null, photos: { proofVisibleToParents: false } as PhotoSetting };
 type Settings = typeof DEFAULTS;
 
 /** Réglages d'un établissement (référent vie scolaire…) : jamais partagés d'une école à l'autre. */

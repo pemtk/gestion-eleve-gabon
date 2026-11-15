@@ -1,9 +1,11 @@
 import { Global, Module } from '@nestjs/common';
-import { APP_GUARD, APP_PIPE } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { StandardSchemaValidationPipe } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { DashboardService } from './dashboard/dashboard.service.js';
 import { IndicatorsService } from './indicators/indicators.service.js';
+import { FilesController, PayloadTooLargeFilter } from './files/files.controller.js';
+import { FilesService } from './files/files.service.js';
 import { AuditController } from './audit/audit.controller.js';
 import { AuditService } from './audit/audit.service.js';
 import { AccountsService } from './accounts/accounts.service.js';
@@ -46,10 +48,11 @@ export function jwtSecret(): string {
     HealthController, AuthController, DashboardController,
     SchoolUsersController, SchoolConfigController, SchoolLifeController, SchoolSubscriptionController,
     StudentController, ParentController, TeacherController, AccountController, MessagingController,
-    AgentController, PartnerController, AdminController, AuditController,
+    AgentController, PartnerController, AdminController, AuditController, FilesController,
   ],
   providers: [
-    AuthService, SmsGateway, AccountsService, IndicatorsService, DashboardService, RateLimiter, RefreshTokens, AuditService, CasesService, SchoolPolicy, PartnerService,
+    AuthService, SmsGateway, AccountsService, IndicatorsService, DashboardService, RateLimiter, RefreshTokens, AuditService, FilesService, CasesService, SchoolPolicy, PartnerService,
+    { provide: APP_FILTER, useClass: PayloadTooLargeFilter },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_PIPE, useValue: new StandardSchemaValidationPipe() },

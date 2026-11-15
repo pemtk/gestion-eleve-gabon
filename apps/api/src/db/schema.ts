@@ -15,6 +15,8 @@ export const users = pgTable('users', {
   /** Établissement de rattachement (null pour agent, partenaire et administrateur : profils multi-établissements). */
   schoolId: text('school_id').references(() => organizations.id),
   photoVisibility: text('photo_visibility').notNull().default('school'),
+  /** Photo de profil (table `files`) ; sa visibilité suit `photoVisibility`. */
+  avatarFileId: text('avatar_file_id'),
 }, (t) => [index('users_school_idx').on(t.schoolId)]);
 
 export const otpCodes = pgTable('otp_codes', {
@@ -62,6 +64,27 @@ export const auditLog = pgTable('audit_log', {
   ip: text('ip'),
   details: jsonb('details'),
 }, (t) => [index('audit_log_school_idx').on(t.schoolId, t.at), index('audit_log_resource_idx').on(t.resourceType, t.resourceId)]);
+
+/**
+ * Fichiers téléversés (octets dans le stockage objet, métadonnées ici). Un fichier est « pending » jusqu'à ce qu'un objet le réclame
+ * (preuve d'une tâche, annonce, compte-rendu, photo de profil, message) : les orphelins sont purgés. L'accès se décide à la lecture,
+ * d'après l'objet auquel il est rattaché (`ref_type`, `ref_id`), jamais d'après une URL devinable.
+ */
+export const files = pgTable('files', {
+  id: text('id').primaryKey(),
+  /** Établissement du fichier ; null pour un compte sans école (parent, administrateur) tant qu'il n'est rattaché à aucune. */
+  schoolId: text('school_id').references(() => organizations.id),
+  ownerId: text('owner_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  kind: text('kind').notNull(),
+  name: text('name').notNull(),
+  contentType: text('content_type').notNull(),
+  size: integer('size').notNull(),
+  storageKey: text('storage_key').notNull().unique(),
+  status: text('status').notNull().default('pending'),
+  refType: text('ref_type'),
+  refId: text('ref_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('files_owner_idx').on(t.ownerId), index('files_school_idx').on(t.schoolId), index('files_pending_idx').on(t.status, t.createdAt)]);
 
 /** Réglages clé/valeur : abonnement de l'école, référent vie scolaire, visibilité des photos. */
 /** Réglages par établissement (référent vie scolaire…). */
@@ -217,6 +240,7 @@ export const announcements = pgTable('announcements', {
   /** Auteur (enseignant) et classe visée, le cas échéant. */
   authorId: text('author_id'),
   classId: text('class_id'),
+  attachmentFileId: text('attachment_file_id'),
   at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -279,6 +303,8 @@ export const taskCompletions = pgTable('task_completions', {
   seconds: integer('seconds').notNull().default(0),
   evaluation: text('evaluation'),
   proof: boolean('proof').notNull().default(false),
+  /** Photo de preuve (table `files`), visible de l'enseignant de la classe et, selon le réglage de l'école, du parent. */
+  proofFileId: text('proof_file_id'),
   /** Points accordés à la validation ; annulés si l'enseignant invalide. */
   points: integer('points').notNull().default(0),
   completedAt: timestamp('completed_at', { withTimezone: true }),
@@ -429,4 +455,5 @@ export const visitReports = pgTable('visit_reports', {
   date: text('date').notNull(),
   text: text('text').notNull(),
   visibleToSchool: boolean('visible_to_school').notNull().default(false),
+  attachmentFileId: text('attachment_file_id'),
 });

@@ -5,7 +5,8 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { CurrentUser, Roles, schoolOf, type AuthUser } from '../common/auth.js';
 import { DB, type Db } from '../db/db.module.js';
-import { announcements, attendanceRecords, classes, evaluations, gradeCorrections, grades, students } from '../db/schema.js';
+import { announcements, attendanceRecords, classes, evaluations, files, gradeCorrections, grades, students, visitReports } from '../db/schema.js';
+import { FilesService, toStored } from '../files/files.service.js';
 import { dateLabel } from '../learning/results.js';
 import { getSetting, setSetting } from '../db/settings.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -20,7 +21,7 @@ const actionSchema = z.object({ label: z.string().trim().min(1), owner: z.enum([
 @Roles('etablissement')
 @Controller('school')
 export class SchoolLifeController {
-  constructor(@Inject(DB) private readonly db: Db, private readonly policy: SchoolPolicy, private readonly cases: CasesService, private readonly audit: AuditService) {}
+  constructor(@Inject(DB) private readonly db: Db, private readonly policy: SchoolPolicy, private readonly cases: CasesService, private readonly audit: AuditService, private readonly files: FilesService) {}
 
   /** Trace l'accès (ou la tentative refusée) à un signalement confidentiel. */
   private trace<T>(user: AuthUser, ip: string, action: string, id: string | null, fn: () => Promise<T>, details?: Record<string, unknown>) {
@@ -91,16 +92,31 @@ export class SchoolLifeController {
   }
 
   @Get('announcements')
-  list(@CurrentUser() user: AuthUser) {
-    return this.db.select().from(announcements).where(eq(announcements.schoolId, schoolOf(user))).orderBy(desc(announcements.at));
+  async announcements(@CurrentUser() user: AuthUser) {
+    const rows = await this.db.select({ a: announcements, f: files }).from(announcements).leftJoin(files, eq(files.id, announcements.attachmentFileId))
+      .where(eq(announcements.schoolId, schoolOf(user))).orderBy(desc(announcements.at));
+    return rows.map(({ a, f }) => ({ ...a, attachment: f ? toStored(f) : null }));
   }
 
+  /** §8.3 — comptes-rendus de visite que l'agent a choisi de partager avec l'école. */
+  @Get('visit-reports')
+  async visitReports(@CurrentUser() user: AuthUser) {
+    const rows = await this.db.select({ r: visitReports, f: files }).from(visitReports).leftJoin(files, eq(files.id, visitReports.attachmentFileId))
+      .where(and(eq(visitReports.schoolId, schoolOf(user)), eq(visitReports.visibleToSchool, true))).orderBy(desc(visitReports.id));
+    return rows.map(({ r, f }) => ({ id: r.id, date: r.date, text: r.text, attachment: f ? toStored(f) : null }));
+  }
+
+  /** §7.9 — la pièce jointe (PDF ou image, 5 Mo) est envoyée au préalable (`POST /files`, usage « attachment »). */
   @Post('announcements')
   async announce(@CurrentUser() user: AuthUser, @Body({ schema: announcementSchema }) body: z.infer<typeof announcementSchema>) {
     const sid = schoolOf(user);
     await this.policy.assertWritable(sid);
-    const [a] = await this.db.insert(announcements).values({ id: randomUUID(), schoolId: sid, title: body.title ?? '', message: body.message, audience: body.audience, target: body.target }).returning();
-    return a;
+    return this.db.transaction(async (tx) => {
+      const id = randomUUID();
+      const [a] = await tx.insert(announcements).values({ id, schoolId: sid, title: body.title ?? '', message: body.message, audience: body.audience, target: body.target, attachmentFileId: body.attachmentFileId }).returning();
+      const attachment = body.attachmentFileId ? toStored(await this.files.attach(tx, user, body.attachmentFileId, 'attachment', 'announcement', id)) : null;
+      return { ...a!, attachment };
+    });
   }
 
   /** §7.10 — sans référent confirmé, seuls les signalements « conduite / engagement » sont possibles. */

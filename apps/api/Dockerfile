@@ -25,6 +25,10 @@ COPY --from=build /app/apps/api/package.json /app/apps/api/
 COPY --from=build /app/apps/api/dist /app/apps/api/dist
 # Migrations SQL appliquées au démarrage (RUN_MIGRATIONS=false pour les jouer à part : npm run db:migrate)
 COPY --from=build /app/apps/api/drizzle /app/apps/api/drizzle
+# Fichiers téléversés (stockage disque par défaut) : dossier propre à l'utilisateur « node », à monter sur un volume.
+RUN mkdir -p /data/files && chown node:node /data/files
+ENV FILES_DIR=/data/files
+VOLUME /data/files
 USER node
 EXPOSE 3000
 # DATABASE_URL et JWT_SECRET sont obligatoires en production (voir .env.example)

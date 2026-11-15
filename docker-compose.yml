@@ -25,6 +25,9 @@ services:
       # Sans démo : crée le premier administrateur au démarrage (voir README « Comptes »).
       BOOTSTRAP_ADMIN_PHONE: ${BOOTSTRAP_ADMIN_PHONE:-}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      # Fichiers téléversés : volume local par défaut ; FILES_DRIVER=s3 (+ FILES_S3_*) pour un stockage objet.
+      FILES_DRIVER: ${FILES_DRIVER:-local}
+    volumes: ['files:/data/files']
     ports: ['3000:3000']
     depends_on:
       db: { condition: service_healthy }
@@ -44,3 +47,4 @@ services:
 
 volumes:
   pgdata:
+  files:

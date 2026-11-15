@@ -194,4 +194,19 @@ describe('Isolation entre établissements', () => {
       await get('/school/students', await c.token(role)).expect(403);
     }
   });
+  it('les fichiers d’une école sont introuvables depuis une autre, par lecture comme par lien signé', async () => {
+    const pdf = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj');
+    const up = (await c.api().post('/files').set(c.as(a)).field('kind', 'attachment').attach('file', pdf, { filename: 'a.pdf', contentType: 'application/pdf' }).expect(201)).body as { id: string };
+    const annonce = (await post('/school/announcements', a, { message: 'Circulaire', audience: 'school', attachmentFileId: up.id }).expect(201)).body;
+    expect((await get('/school/announcements', a).expect(200)).body.find((x: { id: string }) => x.id === annonce.id).attachment.id).toBe(up.id);
+    await c.api().get(`/files/${up.id}`).set(c.as(b)).expect(404);
+    await c.api().get(`/files/${up.id}/url`).set(c.as(b)).expect(404);
+    expect((await get('/school/announcements', b).expect(200)).body.some((x: { attachment: unknown }) => x.attachment)).toBe(false);
+    // la direction de B ne peut pas non plus rattacher à SON annonce un fichier envoyé par A
+    await post('/school/announcements', b, { message: 'Copie', audience: 'school', attachmentFileId: up.id }).expect(400);
+    // un fichier envoyé par B porte le school_id de B
+    const mine = (await c.api().post('/files').set(c.as(b)).field('kind', 'attachment').attach('file', pdf, { filename: 'b.pdf', contentType: 'application/pdf' }).expect(201)).body as { id: string };
+    await c.api().get(`/files/${mine.id}`).set(c.as(b)).expect(200);
+    await c.api().get(`/files/${mine.id}`).set(c.as(a)).expect(404);
+  });
 });

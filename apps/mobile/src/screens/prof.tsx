@@ -4,6 +4,7 @@ import { Pressable, Text, TextInput, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { ANNOUNCE_TEMPLATES, TASK_TYPES, average, formatGrade, type TaskType } from '@sge/shared';
 import { Icon } from '@/components/icon';
+import { RemoteImage } from '@/components/remote-image';
 import { Avatar, B, Bar, Btn, Card, Chips, Field, H, Header, Kicker, ListRow, Loading, Muted, Num, Pill, Screen, Seg, Toggle } from '@/components/ui';
 import { ApiError, api } from '@/lib/api';
 import { useSession } from '@/lib/session';
@@ -226,7 +227,7 @@ export function NouvelleTache() {
   );
 }
 
-type Row = { studentId: string; name: string; initials: string; status: 'done' | 'doing' | 'none' | 'redo'; time: string; evaluation: '' | 'ok' | 'doubt'; proof: boolean };
+type Row = { studentId: string; name: string; initials: string; status: 'done' | 'doing' | 'none' | 'redo'; time: string; evaluation: '' | 'ok' | 'doubt'; proof: boolean; proofFileId: string | null };
 const SV_LABEL = { done: 'Terminé', doing: 'En cours', none: 'Pas commencé', redo: 'À refaire' };
 export function Suivi() {
   const router = useRouter();
@@ -237,6 +238,7 @@ export function Suivi() {
   const [f, setF] = useState<'all' | 'doubt' | 'todo'>('all');
   const [note, setNote] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [shown, setShown] = useState<string | null>(null);
   if (list.data && !list.data.length && !task) return <Screen><Header title="Suivi des tâches" /><B color={C.n[700]}>Vous n’avez pas encore publié de tâche.</B><Btn label="Nouvelle tâche" icon="plus" onPress={() => router.push('/prof/tache')} /></Screen>;
   if (!data) return <Loading error={error ?? list.error} />;
   const rows = data.rows.filter((r) => f === 'all' || (f === 'doubt' ? r.evaluation === 'doubt' : r.status === 'none' || r.status === 'redo'));
@@ -258,8 +260,9 @@ export function Suivi() {
         <Card key={r.studentId} style={{ gap: 8 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Avatar initials={r.initials} size={38} /><B style={{ flex: 1 }}>{r.name}</B>
-            {r.evaluation !== '' && <Icon name={r.evaluation === 'ok' ? 'smile' : 'circle-help'} size={18} color={C.a[700]} />}{r.proof && <Icon name="camera" size={18} color={C.a[700]} />}
+            {r.evaluation !== '' && <Icon name={r.evaluation === 'ok' ? 'smile' : 'circle-help'} size={18} color={C.a[700]} />}{r.proof && r.proofFileId && <Pressable onPress={() => setShown(shown === r.proofFileId ? null : r.proofFileId)} accessibilityRole="button" accessibilityLabel={`Photo de ${r.name}`} hitSlop={10}><Icon name="camera" size={18} color={C.a[700]} /></Pressable>}
           </View>
+          {r.proofFileId && shown === r.proofFileId && <RemoteImage fileId={r.proofFileId} size={260} style={{ alignSelf: 'center', width: '100%', maxWidth: 360, height: 260 }} />}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <Pill label={SV_LABEL[r.status]} /><Muted size={12}>{r.time}</Muted><View style={{ flex: 1 }} />
             {r.status === 'done' && <Btn variant="link" label="Invalider" onPress={() => invalidate(r)} />}

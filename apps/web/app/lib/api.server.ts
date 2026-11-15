@@ -13,10 +13,12 @@ export class ApiError extends Error {
 async function call<T>(method: string, path: string, token?: string, body?: unknown): Promise<T> {
   let res: Response;
   try {
+    // Un envoi de fichier part en multipart (le navigateur de l'utilisateur ne parle jamais à l'API : le jeton reste côté serveur).
+    const multipart = body instanceof FormData;
     res = await fetch(`${BASE}${path}`, {
       method,
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: { ...(multipart ? {} : { 'Content-Type': 'application/json' }), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: body === undefined ? undefined : multipart ? body : JSON.stringify(body),
     });
   } catch {
     throw new ApiError(503, 'Le serveur est injoignable. Réessayez dans un instant.');
@@ -53,6 +55,22 @@ export async function spaceApi(request: Request, space: WebSpace) {
     put: <T>(path: string, body?: unknown) => wrap(() => call<T>('PUT', path, token, body)),
     patch: <T>(path: string, body?: unknown) => wrap(() => call<T>('PATCH', path, token, body)),
     del: <T>(path: string) => wrap(() => call<T>('DELETE', path, token)),
+    /** Envoie un fichier (`POST /files`) si le formulaire en contient un ; retourne son identifiant. */
+    uploadIfAny: async (fd: FormData, field: string, kind: string): Promise<string | undefined> => {
+      const file = fd.get(field);
+      if (!(file instanceof File) || !file.size) return undefined;
+      const form = new FormData();
+      form.set('kind', kind);
+      form.set('file', file, file.name);
+      return (await wrap(() => call<{ id: string }>('POST', '/files', token, form))).id;
+    },
+    /** Réponse brute de l'API (téléchargement de fichier) : le jeton ne quitte pas le serveur. */
+    raw: async (path: string) => {
+      let res: Response;
+      try { res = await fetch(`${BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } }); } catch { throw new ApiError(503, 'Le serveur est injoignable. Réessayez dans un instant.'); }
+      if (res.status === 401) throw await destroyUserSession(request);
+      return res;
+    },
   };
 }
 

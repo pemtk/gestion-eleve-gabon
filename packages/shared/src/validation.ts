@@ -137,7 +137,8 @@ export const announcementSchema = z.object({
   message: z.string().trim().min(1),
   audience: z.enum(['school', 'level', 'class', 'teachers', 'parents']),
   target: z.string().optional(),
-  attachment: z.string().optional(),
+  /** Fichier téléversé au préalable (`POST /files`, usage « attachment »). */
+  attachmentFileId: z.string().optional(),
 });
 
 export const REPORT_KINDS = ['conduite', 'confidentiel'] as const;
@@ -201,7 +202,8 @@ export const visitReportSchema = z.object({
   schoolId: z.string(),
   date: z.string(),
   observations: z.string().trim().min(1),
-  attachment: z.string().optional(),
+  /** Fichier téléversé au préalable (`POST /files`, usage « report »). */
+  attachmentFileId: z.string().optional(),
   visibleToSchool: z.boolean().default(false),
 });
 

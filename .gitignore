@@ -8,6 +8,7 @@ build/
 !.env.example
 *.tsbuildinfo
 coverage/
+data/
 .DS_Store
 expo-env.d.ts
 ios/

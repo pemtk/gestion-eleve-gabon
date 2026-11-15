@@ -4,6 +4,7 @@ export default [
   index('routes/home.tsx'),
   route('login', 'routes/login.tsx'),
   route('logout', 'routes/logout.tsx'),
+  route('fichiers/:id', 'routes/fichier.ts'),
 
   // Établissement (administrateur d'école)
   ...prefix('ecole', [
