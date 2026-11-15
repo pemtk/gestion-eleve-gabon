@@ -2,7 +2,6 @@ import { Global, Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { StandardSchemaValidationPipe } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
-import { DashboardService } from './dashboard/dashboard.service.js';
 import { IndicatorsService } from './indicators/indicators.service.js';
 import {
   FilesController,
@@ -57,6 +56,10 @@ import { ConversationUnreadService } from './messaging/conversation-unread.servi
 import { ConversationThreadsService } from './messaging/conversation-threads.service.js';
 import { ConversationMessagesService } from './messaging/conversation-messages.service.js';
 import { ConversationContactsService } from './messaging/conversation-contacts.service.js';
+import { SchoolDashboardService } from './dashboard/school-dashboard.service.js';
+import { AgentDashboardService } from './dashboard/agent-dashboard.service.js';
+import { NetworkDashboardService } from './dashboard/network-dashboard.service.js';
+import { AdminDashboardService } from './dashboard/admin-dashboard.service.js';
 import { ConversationsController } from './messaging/conversations.controller.js';
 import { NavController } from './nav/nav.controller.js';
 import { NavService } from './nav/nav.service.js';
@@ -128,7 +131,10 @@ export function jwtSecret(): string {
     SmsGateway,
     AccountsService,
     IndicatorsService,
-    DashboardService,
+    SchoolDashboardService,
+    AgentDashboardService,
+    NetworkDashboardService,
+    AdminDashboardService,
     RateLimiter,
     RefreshTokens,
     AuditService,

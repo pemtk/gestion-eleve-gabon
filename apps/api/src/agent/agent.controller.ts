@@ -20,7 +20,7 @@ import {
 } from '../db/schema.js';
 import { FilesService, toStored } from '../files/files.service.js';
 import { alertsOf } from '../dashboard/alerts.js';
-import { DashboardService } from '../dashboard/dashboard.service.js';
+import { AgentDashboardService } from '../dashboard/agent-dashboard.service.js';
 import { IndicatorsService } from '../indicators/indicators.service.js';
 
 /** Un agent ne voit que les établissements de son périmètre (table `user_scopes`). */
@@ -30,7 +30,7 @@ export class AgentController {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly indicators: IndicatorsService,
-    private readonly dashboards: DashboardService,
+    private readonly dashboards: AgentDashboardService,
     private readonly files: FilesService,
   ) {}
 
