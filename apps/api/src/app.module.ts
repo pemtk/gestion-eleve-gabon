@@ -13,7 +13,6 @@ import { AuditService } from './audit/audit.service.js';
 import { AccountsService } from './accounts/accounts.service.js';
 import { AgentController } from './agent/agent.controller.js';
 import { AuthController } from './auth/auth.controller.js';
-import { AuthService } from './auth/auth.service.js';
 import {
   ACCESS_TTL_SECONDS,
   RefreshTokens,
@@ -60,6 +59,12 @@ import { SchoolDashboardService } from './dashboard/school-dashboard.service.js'
 import { AgentDashboardService } from './dashboard/agent-dashboard.service.js';
 import { NetworkDashboardService } from './dashboard/network-dashboard.service.js';
 import { AdminDashboardService } from './dashboard/admin-dashboard.service.js';
+import { UserLookupService } from './auth/user-lookup.service.js';
+import { AuthThrottleService } from './auth/auth-throttle.service.js';
+import { OtpService } from './auth/otp.service.js';
+import { AuthSessionService } from './auth/auth-session.service.js';
+import { PasswordService } from './auth/password.service.js';
+import { AuthService } from './auth/authentication.service.js';
 import { ConversationsController } from './messaging/conversations.controller.js';
 import { NavController } from './nav/nav.controller.js';
 import { NavService } from './nav/nav.service.js';
@@ -127,6 +132,11 @@ export function jwtSecret(): string {
     FilesController,
   ],
   providers: [
+    UserLookupService,
+    AuthThrottleService,
+    OtpService,
+    AuthSessionService,
+    PasswordService,
     AuthService,
     SmsGateway,
     AccountsService,
