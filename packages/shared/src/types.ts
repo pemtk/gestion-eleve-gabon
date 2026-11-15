@@ -90,7 +90,14 @@ export interface SideItem {
   highlight?: boolean;
 }
 export interface DashboardData {
-  head: { kicker: string; title: string; action: string; actionIcon: string; toast: string; filters: { icon: string; label: string }[] };
+  head: {
+    kicker: string;
+    title: string;
+    action: string;
+    actionIcon: string;
+    toast: string;
+    filters: { icon: string; label: string }[];
+  };
   kpis: Kpi[];
   chart: { title: string; sub: string; legendA: string; legendB: string; rows: BarRow[] };
   side: { title: string; items: SideItem[] };
@@ -186,7 +193,17 @@ export interface TechIncident {
   actionIcon: string;
 }
 
-export const PROVINCE_NAMES = ['Estuaire', 'Haut-Ogooué', 'Ogooué-Maritime', 'Woleu-Ntem', 'Ngounié', 'Moyen-Ogooué', 'Nyanga', 'Ogooué-Ivindo', 'Ogooué-Lolo'] as const;
+export const PROVINCE_NAMES = [
+  'Estuaire',
+  'Haut-Ogooué',
+  'Ogooué-Maritime',
+  'Woleu-Ntem',
+  'Ngounié',
+  'Moyen-Ogooué',
+  'Nyanga',
+  'Ogooué-Ivindo',
+  'Ogooué-Lolo',
+] as const;
 export type Province = (typeof PROVINCE_NAMES)[number];
 export const SCHOOL_LEVELS = ['Primaire', 'Collège', 'Lycée'] as const;
 export type SchoolLevel = (typeof SCHOOL_LEVELS)[number];

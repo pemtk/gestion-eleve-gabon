@@ -1,13 +1,21 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createCookieSessionStorage, redirect } from 'react-router';
-import { ROLE_OF_SPACE, WEB_HOME, WEB_SPACE_OF, type SessionUser, type WebSpace } from '@sge/shared';
+import {
+  ROLE_OF_SPACE,
+  WEB_HOME,
+  WEB_SPACE_OF,
+  type SessionUser,
+  type WebSpace,
+} from '@sge/shared';
 
 type SessionData = { token: string; refreshToken: string; user: SessionUser };
 
 /** Jeton d'accès renouvelé pendant la requête en cours (le cookie n'est mis à jour qu'à la réponse) : tous les chargements de la page le partagent. */
 export const renewed = new AsyncLocalStorage<{ token: string }>();
 
-const secret = process.env.SESSION_SECRET ?? (process.env.NODE_ENV === 'production' ? '' : 'dev-only-session-secret');
+const secret =
+  process.env.SESSION_SECRET ??
+  (process.env.NODE_ENV === 'production' ? '' : 'dev-only-session-secret');
 if (!secret) throw new Error('SESSION_SECRET est obligatoire en production.');
 
 export const sessions = createCookieSessionStorage<SessionData>({
@@ -32,11 +40,15 @@ export async function createUserSession(token: string, refreshToken: string, use
   session.set('refreshToken', refreshToken);
   session.set('user', user);
   const space = WEB_SPACE_OF[user.role];
-  return redirect(space ? WEB_HOME[space] : '/login', { headers: { 'Set-Cookie': await sessions.commitSession(session) } });
+  return redirect(space ? WEB_HOME[space] : '/login', {
+    headers: { 'Set-Cookie': await sessions.commitSession(session) },
+  });
 }
 
 export async function destroyUserSession(request: Request) {
-  return redirect('/login', { headers: { 'Set-Cookie': await sessions.destroySession(await getSession(request)) } });
+  return redirect('/login', {
+    headers: { 'Set-Cookie': await sessions.destroySession(await getSession(request)) },
+  });
 }
 
 /** Charge la session ; sans session valide pour l'espace demandé, retourne vers la connexion. */

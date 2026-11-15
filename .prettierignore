@@ -4,3 +4,10 @@ build
 .react-router
 .expo
 package-lock.json
+**/*.generated.ts
+apps/api/drizzle
+apps/api/data
+coverage
+.expo
+expo-env.d.ts
+*.md

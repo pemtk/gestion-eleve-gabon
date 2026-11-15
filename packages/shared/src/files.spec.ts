@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { FILE_POLICIES, acceptedTypes, formatBytes } from './index.js';
 
 describe('fichiers', () => {
-  it('formate les tailles', () => expect([formatBytes(900), formatBytes(2048), formatBytes(5 * 1024 * 1024), formatBytes(1.5 * 1024 * 1024)]).toEqual(['1 Ko', '2 Ko', '5 Mo', '1,5 Mo']));
+  it('formate les tailles', () =>
+    expect([
+      formatBytes(900),
+      formatBytes(2048),
+      formatBytes(5 * 1024 * 1024),
+      formatBytes(1.5 * 1024 * 1024),
+    ]).toEqual(['1 Ko', '2 Ko', '5 Mo', '1,5 Mo']));
   it('liste les types acceptés', () => {
     expect(acceptedTypes('proof')).toBe('JPEG, PNG ou WebP');
     expect(acceptedTypes('report')).toBe('JPEG, PNG, WebP ou PDF');

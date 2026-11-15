@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Inject, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import type { NodePgQueryResultHKT } from 'drizzle-orm/node-postgres';
 import type { PgDatabase } from 'drizzle-orm/pg-core';
@@ -26,7 +31,12 @@ export interface NewAccount {
   id?: string;
 }
 
-const WEB_ROLES = new Set<Role>(['etablissement', 'agent', 'partenaire', 'admin']);
+const WEB_ROLES = new Set<Role>([
+  'etablissement',
+  'agent',
+  'partenaire',
+  'admin',
+]);
 
 /**
  * Création des comptes. Un numéro de téléphone = un compte sur toute la plateforme (identifiant de connexion).
@@ -34,25 +44,47 @@ const WEB_ROLES = new Set<Role>(['etablissement', 'agent', 'partenaire', 'admin'
  */
 @Injectable()
 export class AccountsService {
-  constructor(@Inject(DB) private readonly db: Db, private readonly sms: SmsGateway) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly sms: SmsGateway,
+  ) {}
 
   async phoneTaken(phone: string, ex: Executor = this.db): Promise<boolean> {
-    const [row] = await ex.select({ id: users.id }).from(users).where(eq(users.phone, normalizePhone(phone)));
+    const [row] = await ex
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.phone, normalizePhone(phone)));
     return !!row;
   }
 
   async create(a: NewAccount, ex: Executor = this.db) {
     const phone = normalizePhone(a.phone);
-    if (phone.length < 8 || phone.length > 9) throw new BadRequestException('Numéro de téléphone invalide (format +241…).');
-    if (await this.phoneTaken(phone, ex)) throw new ConflictException('Un compte existe déjà avec ce numéro.');
+    if (phone.length < 8 || phone.length > 9)
+      throw new BadRequestException(
+        'Numéro de téléphone invalide (format +241…).',
+      );
+    if (await this.phoneTaken(phone, ex))
+      throw new ConflictException('Un compte existe déjà avec ce numéro.');
     try {
-      const [row] = await ex.insert(users).values({
-        id: a.id ?? `u-${randomUUID()}`, phone, name: a.name.trim(), initials: initials(a.name), role: a.role, title: a.title ?? '',
-        organization: a.organization ?? null, passwordHash: a.passwordHash ?? null, activated: a.activated ?? false, schoolId: a.schoolId ?? null,
-      }).returning();
+      const [row] = await ex
+        .insert(users)
+        .values({
+          id: a.id ?? `u-${randomUUID()}`,
+          phone,
+          name: a.name.trim(),
+          initials: initials(a.name),
+          role: a.role,
+          title: a.title ?? '',
+          organization: a.organization ?? null,
+          passwordHash: a.passwordHash ?? null,
+          activated: a.activated ?? false,
+          schoolId: a.schoolId ?? null,
+        })
+        .returning();
       return row!;
     } catch (e) {
-      if (isUniqueViolation(e)) throw new ConflictException('Un compte existe déjà avec ce numéro.');
+      if (isUniqueViolation(e))
+        throw new ConflictException('Un compte existe déjà avec ce numéro.');
       throw e;
     }
   }
@@ -67,6 +99,9 @@ export class AccountsService {
     const how = WEB_ROLES.has(user.role as Role)
       ? `Rendez-vous sur ${process.env.WEB_URL ?? 'http://localhost:5173'}`
       : 'Installez l’application Gestion Élève Gabon';
-    this.sms.send(user.phone, `Bonjour ${first}, votre compte Gestion Élève Gabon${place} est prêt. ${how}, choisissez « Code SMS » et saisissez le ${user.phone} pour l’activer.`);
+    this.sms.send(
+      user.phone,
+      `Bonjour ${first}, votre compte Gestion Élève Gabon${place} est prêt. ${how}, choisissez « Code SMS » et saisissez le ${user.phone} pour l’activer.`,
+    );
   }
 }

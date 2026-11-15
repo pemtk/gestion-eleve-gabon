@@ -18,13 +18,20 @@ export class SchoolPolicy {
 
   async assertWritable(schoolId: string) {
     if ((await this.subscription(schoolId)).suspended) {
-      throw new ForbiddenException({ code: 'SUBSCRIPTION_SUSPENDED', message: 'Abonnement suspendu : consultation seule.' });
+      throw new ForbiddenException({
+        code: 'SUBSCRIPTION_SUSPENDED',
+        message: 'Abonnement suspendu : consultation seule.',
+      });
     }
   }
 
   async require(schoolId: string, feature: PlanFeatureKey) {
     if (!(await this.features(schoolId))[feature]) {
-      throw new ForbiddenException({ code: 'PLAN_REQUIRED', feature, message: 'Cette fonction n’est pas incluse dans votre formule.' });
+      throw new ForbiddenException({
+        code: 'PLAN_REQUIRED',
+        feature,
+        message: 'Cette fonction n’est pas incluse dans votre formule.',
+      });
     }
   }
 }

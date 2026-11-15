@@ -13,8 +13,16 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const space = user && WEB_SPACE_OF[user.role];
   if (!space) throw redirect('/login');
   const res = await (await spaceApi(request, space)).raw(`/files/${encodeURIComponent(params.id)}`);
-  if (!res.ok) throw new Response('Fichier introuvable.', { status: res.status === 404 ? 404 : 502 });
-  const headers = new Headers({ 'Cache-Control': 'private, max-age=60', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox" });
-  for (const h of ['content-type', 'content-disposition', 'content-length']) { const v = res.headers.get(h); if (v) headers.set(h, v); }
+  if (!res.ok)
+    throw new Response('Fichier introuvable.', { status: res.status === 404 ? 404 : 502 });
+  const headers = new Headers({
+    'Cache-Control': 'private, max-age=60',
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': "default-src 'none'; sandbox",
+  });
+  for (const h of ['content-type', 'content-disposition', 'content-length']) {
+    const v = res.headers.get(h);
+    if (v) headers.set(h, v);
+  }
   return new Response(res.body, { status: 200, headers });
 }

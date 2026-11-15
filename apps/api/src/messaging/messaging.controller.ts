@@ -15,13 +15,26 @@ export class MessagingController {
 
   @Get('notifications')
   async notifications(@CurrentUser() user: AuthUser) {
-    const read = new Set((await this.db.select().from(notificationReads).where(eq(notificationReads.userId, user.sub))).map((r) => r.notificationId));
-    return NOTIFICATIONS[user.role as MobileRole].map((n) => ({ ...n, read: read.has(n.id) }));
+    const read = new Set(
+      (
+        await this.db
+          .select()
+          .from(notificationReads)
+          .where(eq(notificationReads.userId, user.sub))
+      ).map((r) => r.notificationId),
+    );
+    return NOTIFICATIONS[user.role as MobileRole].map((n) => ({
+      ...n,
+      read: read.has(n.id),
+    }));
   }
 
   @Post('notifications/read-all')
   async readAll(@CurrentUser() user: AuthUser) {
-    const rows = NOTIFICATIONS[user.role as MobileRole].map((n) => ({ userId: user.sub, notificationId: n.id }));
+    const rows = NOTIFICATIONS[user.role as MobileRole].map((n) => ({
+      userId: user.sub,
+      notificationId: n.id,
+    }));
     await this.db.insert(notificationReads).values(rows).onConflictDoNothing();
     return { ok: true };
   }

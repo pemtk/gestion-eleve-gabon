@@ -13,10 +13,15 @@ export interface Limit {
 
 export class TooManyRequestsException extends HttpException {
   constructor(readonly retryAfterSeconds: number) {
-    super({
-      statusCode: HttpStatus.TOO_MANY_REQUESTS, code: 'RATE_LIMITED', retryAfterSeconds,
-      message: `Trop de tentatives. Réessayez dans ${retryAfterSeconds >= 120 ? `${Math.ceil(retryAfterSeconds / 60)} minutes` : `${retryAfterSeconds} secondes`}.`,
-    }, HttpStatus.TOO_MANY_REQUESTS);
+    super(
+      {
+        statusCode: HttpStatus.TOO_MANY_REQUESTS,
+        code: 'RATE_LIMITED',
+        retryAfterSeconds,
+        message: `Trop de tentatives. Réessayez dans ${retryAfterSeconds >= 120 ? `${Math.ceil(retryAfterSeconds / 60)} minutes` : `${retryAfterSeconds} secondes`}.`,
+      },
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
   }
 }
 
@@ -44,16 +49,29 @@ export class RateLimiter {
   async check(...keys: string[]): Promise<void> {
     let wait = 0;
     for (const key of keys) {
-      const [row] = await this.db.select({ blockedUntil: rateLimits.blockedUntil }).from(rateLimits).where(eq(rateLimits.key, key));
-      if (row?.blockedUntil && row.blockedUntil.getTime() > Date.now()) wait = Math.max(wait, Math.ceil((row.blockedUntil.getTime() - Date.now()) / 1000));
+      const [row] = await this.db
+        .select({ blockedUntil: rateLimits.blockedUntil })
+        .from(rateLimits)
+        .where(eq(rateLimits.key, key));
+      if (row?.blockedUntil && row.blockedUntil.getTime() > Date.now())
+        wait = Math.max(
+          wait,
+          Math.ceil((row.blockedUntil.getTime() - Date.now()) / 1000),
+        );
     }
     if (wait) throw new TooManyRequestsException(wait);
   }
 
-  async hit(key: string, limit: Limit): Promise<{ count: number; blocked: boolean }> {
+  async hit(
+    key: string,
+    limit: Limit,
+  ): Promise<{ count: number; blocked: boolean }> {
     const windowSeconds = limit.windowMs / 1000;
     const blockSeconds = limit.blockMs / 1000;
-    const result = await this.db.execute<{ count: number; blocked: boolean }>(sql`
+    const result = await this.db.execute<{
+      count: number;
+      blocked: boolean;
+    }>(sql`
       INSERT INTO rate_limits AS r (key, count, window_start, blocked_until)
       VALUES (${key}, 1, now(), CASE WHEN 1 >= ${limit.max} THEN now() + make_interval(secs => ${blockSeconds}) END)
       ON CONFLICT (key) DO UPDATE SET
@@ -68,6 +86,7 @@ export class RateLimiter {
   }
 
   async reset(...keys: string[]): Promise<void> {
-    for (const key of keys) await this.db.delete(rateLimits).where(eq(rateLimits.key, key));
+    for (const key of keys)
+      await this.db.delete(rateLimits).where(eq(rateLimits.key, key));
   }
 }

@@ -9,10 +9,19 @@ export function useApi<T>(path: string | null) {
   const [loading, setLoading] = useState(true);
   const load = useCallback(async () => {
     if (!path) return;
-    try { setError(null); setData(await api.get<T>(path)); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Erreur'); }
-    finally { setLoading(false); }
+    try {
+      setError(null);
+      setData(await api.get<T>(path));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erreur');
+    } finally {
+      setLoading(false);
+    }
   }, [path]);
-  useFocusEffect(useCallback(() => { void load(); }, [load]));
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
   return { data, error, loading, reload: load, setData };
 }

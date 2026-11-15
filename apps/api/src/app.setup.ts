@@ -10,7 +10,15 @@ import helmet from 'helmet';
 export function configureApp(app: INestApplication): void {
   const express = app as NestExpressApplication;
   const trust = process.env.TRUST_PROXY;
-  if (trust) express.set('trust proxy', /^\d+$/.test(trust) ? Number(trust) : trust);
+  if (trust)
+    express.set('trust proxy', /^\d+$/.test(trust) ? Number(trust) : trust);
   // API JSON : pas de page à protéger par une CSP complexe, mais tout le reste des protections par défaut s'applique.
-  app.use(helmet({ crossOriginResourcePolicy: { policy: 'same-site' }, contentSecurityPolicy: { directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } } }));
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'same-site' },
+      contentSecurityPolicy: {
+        directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] },
+      },
+    }),
+  );
 }

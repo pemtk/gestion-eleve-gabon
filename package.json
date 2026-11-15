@@ -13,7 +13,8 @@
     "typecheck": "npm run build:packages && npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run build:packages && npm run test --workspaces --if-present",
-    "format": "prettier --write ."
+    "format": "prettier --write \"{apps,packages}/**/*.{ts,tsx,css}\"",
+    "format:check": "prettier --check \"{apps,packages}/**/*.{ts,tsx,css}\""
   },
   "devDependencies": {
     "prettier": "^3.4.2"

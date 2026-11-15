@@ -9,5 +9,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function EcoleDashboard({ loaderData: d }: Route.ComponentProps) {
-  return <DashboardView data={d} actionTo="/ecole/utilisateurs/import" statsLocked={d.statsLocked} />;
+  return (
+    <DashboardView data={d} actionTo="/ecole/utilisateurs/import" statsLocked={d.statsLocked} />
+  );
 }

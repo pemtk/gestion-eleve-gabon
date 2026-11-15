@@ -9,5 +9,5 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export default function Layout({ loaderData }: Route.ComponentProps) {
-  return <Shell space="partenaire" user={loaderData.user} nav={loaderData.nav}  />;
+  return <Shell space="partenaire" user={loaderData.user} nav={loaderData.nav} />;
 }
