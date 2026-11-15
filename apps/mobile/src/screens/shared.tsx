@@ -1,84 +1,19 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { useEffect, useState } from 'react';
-import { Image, Linking, Pressable, Switch, Text, TextInput, View } from 'react-native';
-import { FAQ, SUPPORT, TIPS, initials, isPasswordValid, passwordRules, type Message, type ThreadSummary } from '@sge/shared';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Image, Linking, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
+import { FAQ, SUPPORT, TIPS, initials, isPasswordValid, passwordRules, type Contact, type Message, type ThreadSummary } from '@sge/shared';
 import { Icon } from '@/components/icon';
 import { Avatar, B, Btn, Card, Field, H, Header, Kicker, ListRow, Loading, Muted, Rules, Screen, Seg } from '@/components/ui';
-import { api, ApiError, getRefreshToken } from '@/lib/api';
+import { api, ApiError, getRefreshToken, NetworkError } from '@/lib/api';
 import { RemoteImage } from '@/components/remote-image';
 import { pickPhoto, uploadPhoto, type Picked } from '@/lib/files';
 import { ROLE_PREFIX, useSession } from '@/lib/session';
 import { useApi } from '@/lib/use-api';
+import { useRolePrefix } from '@/lib/use-role-prefix';
 import { C, F, R } from '@/theme';
 
-const usePrefix = () => ROLE_PREFIX[useSession().user?.role ?? 'eleve'] ?? '/eleve';
-
-/* ---------------- Messagerie (§3.3) ---------------- */
-export function Messages() {
-  const router = useRouter();
-  const prefix = usePrefix();
-  const { data, error } = useApi<ThreadSummary[]>('/threads');
-  if (!data) return <Loading error={error} />;
-  return (
-    <Screen gap={14}>
-      <H size={34}>Messages</H>
-      <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', minHeight: 46, paddingHorizontal: 14, borderWidth: 1, borderColor: C.divider, borderRadius: R.lg }}><Icon name="search" size={17} color={C.n[600]} /><Muted size={14}>Rechercher une conversation</Muted></View>
-      {data.map((t) => (
-        <ListRow key={t.id} onPress={() => router.push(`${prefix}/thread/${t.id}` as '/')} style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-          <Avatar initials={t.initials} icon={t.icon} size={46} />
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><B semi={t.unread > 0}>{t.name}</B><Muted size={12}>{t.time}</Muted></View>
-            <Muted size={12}>{t.kind}</Muted><B size={13.5} numberOfLines={1} color={t.unread ? C.text : C.n[700]}>{t.last}</B>
-          </View>
-          {t.unread > 0 && <View style={{ minWidth: 22, height: 22, borderRadius: 11, backgroundColor: C.a[200], alignItems: 'center', justifyContent: 'center' }}><B size={12} semi color={C.a[800]}>{t.unread}</B></View>}
-        </ListRow>
-      ))}
-      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}><Icon name="info" size={15} color={C.n[600]} /><Muted size={12}>Vous pouvez envoyer du texte et une image par message.</Muted></View>
-    </Screen>
-  );
-}
-
-export function Thread() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const { send } = useSession();
-  const { data, reload, setData } = useApi<Message[]>(`/threads/${id}/messages`);
-  const [draft, setDraft] = useState('');
-  const submit = async (text: string | null, image = false) => {
-    const clientId = `c-${Date.now()}`;
-    const optimistic: Message = { id: clientId, mine: true, text, image, time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) };
-    try {
-      const res = await send('POST', `/threads/${id}/messages`, { text: text ?? undefined, image: image || undefined, clientId });
-      setData((d) => [...(d ?? []), { ...optimistic, pending: res.queued }]);
-      if (!res.queued) void reload();
-    } catch { /* message refusé : le brouillon reste */ return; }
-    setDraft('');
-  };
-  const pickImage = async () => {
-    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6 });
-    if (!r.canceled) await submit(null, true);
-  };
-  return (
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <View style={{ paddingHorizontal: 20, paddingTop: 4 }}><Header title="Conversation" /></View>
-      <Screen gap={8}>
-        <Muted size={12} style={{ textAlign: 'center' }}>Aujourd’hui</Muted>
-        {(data ?? []).map((m) => (
-          <View key={m.id} style={{ alignSelf: m.mine ? 'flex-end' : 'flex-start', maxWidth: '82%', padding: 12, borderRadius: R.lg, backgroundColor: m.mine ? C.a[100] : C.n[100], borderWidth: 1, borderColor: m.mine ? C.a[300] : C.divider, gap: 4 }}>
-            {m.image && <View style={{ width: 180, height: 110, borderRadius: 4, backgroundColor: C.n[300], alignItems: 'center', justifyContent: 'center' }}><Icon name="image" size={26} color={C.n[600]} /><Muted size={11}>photo</Muted></View>}
-            {m.text && <B size={14.5}>{m.text}</B>}
-            <View style={{ flexDirection: 'row', gap: 5, alignSelf: 'flex-end', alignItems: 'center' }}><Muted size={11}>{m.time}</Muted>{m.mine && <Icon name={m.pending ? 'clock' : 'check'} size={12} color={C.n[600]} />}</View>
-          </View>
-        ))}
-      </Screen>
-      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', padding: 12, borderTopWidth: 1, borderTopColor: C.divider }}>
-        <Pressable onPress={pickImage} accessibilityRole="button" accessibilityLabel="Joindre une image" style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><Icon name="image" size={22} color={C.a[700]} /></Pressable>
-        <TextInput value={draft} onChangeText={setDraft} placeholder="Écrire un message…" placeholderTextColor={C.n[500]} accessibilityLabel="Message" onSubmitEditing={() => draft.trim() && submit(draft.trim())} style={{ flex: 1, minHeight: 44, paddingHorizontal: 14, borderWidth: 1, borderColor: C.divider, borderRadius: 22, fontFamily: F.body, fontSize: 15, color: C.text }} />
-        <Pressable onPress={() => draft.trim() && submit(draft.trim())} accessibilityRole="button" accessibilityLabel="Envoyer" style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1.5, borderColor: C.accent, backgroundColor: C.a[100], alignItems: 'center', justifyContent: 'center' }}><Icon name="send" size={19} color={C.a[800]} /></Pressable>
-      </View>
-    </View>
-  );
-}
+const usePrefix = useRolePrefix;
 
 /* ---------------- Notifications (§3.2) ---------------- */
 export function Notifications() {

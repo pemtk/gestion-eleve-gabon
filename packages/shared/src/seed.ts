@@ -188,23 +188,6 @@ export const ANNOUNCE_TEMPLATES: Record<string, string> = {
 };
 
 /* ---- Messagerie et notifications (mobile) ---- */
-export const THREADS: Record<'eleve' | 'parent' | 'enseignant', ThreadSummary[]> = {
-  parent: [
-    { id: 'th1', initials: 'ND', name: 'M. Ndong', kind: 'Classe · professeur principal d’Aïcha', last: 'Bien sûr, nous le reprendrons demain.', time: '09:52', unread: 1 },
-    { id: 'th2', initials: '', name: 'Administration', kind: 'École · Lycée Léon Mba', last: 'Réunion parents-professeurs le 20 novembre.', time: 'Hier', unread: 0, icon: 'school' },
-    { id: 'th3', initials: 'MN', name: 'Mme Nziengui', kind: 'Classe · maîtresse de Junior', last: 'Junior peut revenir demain avec un mot.', time: 'Lun.', unread: 1 },
-  ],
-  eleve: [
-    { id: 'th9', initials: 'ND', name: 'M. Ndong', kind: 'Privé · Mathématiques', last: 'Bien sûr, nous le reprendrons demain.', time: '09:52', unread: 1 },
-    { id: 'th4', initials: '', name: 'Classe 3ème B', kind: 'Classe · 38 membres', last: 'Évaluation demain sur le chapitre 3.', time: '08:10', unread: 2, icon: 'users' },
-    { id: 'th5', initials: '', name: 'Vie scolaire', kind: 'École · Lycée Léon Mba', last: 'Sortie au Musée national le 27 novembre.', time: 'Lun.', unread: 0, icon: 'school' },
-  ],
-  enseignant: [
-    { id: 'th6', initials: 'MO', name: 'Mme Ondo', kind: 'Privé · parent d’Aïcha Ondo', last: 'Elle avait des doutes sur l’exercice 7…', time: '09:40', unread: 1 },
-    { id: 'th7', initials: '', name: 'Parents de 3ème B', kind: 'Classe · 61 parents', last: 'Annonce : évaluation demain, chapitre 3.', time: '08:05', unread: 0, icon: 'users' },
-    { id: 'th8', initials: '', name: 'Direction', kind: 'École · Lycée Léon Mba', last: 'Merci de saisir les notes du 1er trimestre avant vendredi.', time: 'Hier', unread: 1, icon: 'school' },
-  ],
-};
 export const CONVERSATION: Message[] = [
   { id: 'm1', mine: false, text: 'Bonjour, Aïcha a très bien travaillé sur les fractions cette semaine.', time: '09:12' },
   { id: 'm2', mine: true, text: 'Merci ! Elle avait des doutes sur l’exercice 7. Pouvez-vous l’aider demain ?', time: '09:40' },
@@ -253,6 +236,7 @@ export const WEB_NAV: Record<WebSpace, NavItem[]> = {
     { icon: 'calendar-check', label: 'Absences', badge: '12', to: '/ecole/absences' },
     { icon: 'award', label: 'Résultats', to: '/ecole/resultats' },
     { icon: 'megaphone', label: 'Annonces', to: '/ecole/annonces' },
+    { icon: 'message-circle', label: 'Messages', to: '/ecole/messages' },
     { icon: 'shield', label: 'Vie scolaire', badge: '1', to: '/ecole/vie-scolaire' },
     { icon: 'settings', label: 'Configuration', to: '/ecole/configuration' },
     { icon: 'network', label: 'Vue réseau', to: '/ecole/reseau' },

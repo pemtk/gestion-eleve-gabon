@@ -24,6 +24,8 @@ import { AccountController } from './learning/account.controller.js';
 import { ParentController } from './learning/parent.controller.js';
 import { StudentController } from './learning/student.controller.js';
 import { TeacherController } from './learning/teacher.controller.js';
+import { ConversationsController } from './messaging/conversations.controller.js';
+import { ConversationsService } from './messaging/conversations.service.js';
 import { MessagingController } from './messaging/messaging.controller.js';
 import { PartnerController } from './partner/partner.controller.js';
 import { PartnerService } from './partner/partner.service.js';
@@ -47,11 +49,11 @@ export function jwtSecret(): string {
   controllers: [
     HealthController, AuthController, DashboardController,
     SchoolUsersController, SchoolConfigController, SchoolLifeController, SchoolSubscriptionController,
-    StudentController, ParentController, TeacherController, AccountController, MessagingController,
+    StudentController, ParentController, TeacherController, AccountController, MessagingController, ConversationsController,
     AgentController, PartnerController, AdminController, AuditController, FilesController,
   ],
   providers: [
-    AuthService, SmsGateway, AccountsService, IndicatorsService, DashboardService, RateLimiter, RefreshTokens, AuditService, FilesService, CasesService, SchoolPolicy, PartnerService,
+    AuthService, SmsGateway, AccountsService, IndicatorsService, DashboardService, RateLimiter, RefreshTokens, AuditService, FilesService, ConversationsService, CasesService, SchoolPolicy, PartnerService,
     { provide: APP_FILTER, useClass: PayloadTooLargeFilter },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },

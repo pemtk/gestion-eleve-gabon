@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   ATTENDANCE_SEED, FOLLOW_UP, ALERT_PREFS, DEMO_SCHOOL_ID, JUNIOR, THIRD_SCHOOL_ID, WEEK_MINUTES, SECOND_SCHOOL_DATA, SECOND_SCHOOL_DIRECTOR, SECOND_SCHOOL_ID, AGENT_USERS, ASSIGNMENTS, CLASSES, CONFIDENTIAL_CASES, CONVERSATION, DEMO_PASSWORD, DEMO_USERS,
   LINK_REQUESTS, ORGANIZATIONS, REWARDS, SCHOOL_YEAR, STUDENT_START, STUDENTS, SUBJECT_GRADES, TASKS, TEACHERS,
-  TECH_INCIDENTS, THREADS, VISIT_REPORTS,
+  TECH_INCIDENTS, VISIT_REPORTS,
 } from '@sge/shared';
 import { initials, normalizePhone } from '@sge/shared';
 import { hashPassword } from '../auth/password.js';
@@ -12,7 +12,7 @@ import * as t from './schema.js';
 const TABLES = [
   t.users, t.otpCodes, t.settings, t.classes, t.students, t.studentParents, t.teachers, t.linkRequests, t.schoolYears,
   t.assignments, t.evaluations, t.grades, t.gradeCorrections, t.schoolSubjects, t.announcements, t.cases, t.tasks, t.taskCompletions,
-  t.learner, t.workSessions, t.rewards, t.alertPrefs, t.attendanceRecords, t.threads, t.messages, t.notificationReads,
+  t.learner, t.workSessions, t.rewards, t.alertPrefs, t.attendanceRecords, t.conversations, t.conversationMembers, t.conversationReads, t.conversationMessages, t.notificationReads,
   t.organizations, t.orgSubscriptions, t.institutionalUsers, t.incidents, t.visitReports, t.rateLimits, t.refreshTokens, t.auditLog, t.files,
 ];
 
@@ -125,12 +125,32 @@ export async function seedDemo(db: Db, opts: { onlyIfEmpty?: boolean } = {}): Pr
     await tx.insert(t.alertPrefs).values(ALERT_PREFS.map((a) => ({ ...a, userId: PARENT_ID })));
     await tx.insert(t.settings).values({ schoolId: S, key: 'referent', value: { name: 'Rosine Mba', confirmed: true } });
 
-    const threadRows = (['eleve', 'parent', 'enseignant'] as const).flatMap((role) => THREADS[role].map((th) => ({ id: th.id, schoolId: S, role, initials: th.initials, name: th.name, kind: th.kind, last: th.last, time: th.time, unread: th.unread, icon: th.icon ?? null })));
-    await tx.insert(t.threads).values(threadRows);
-    // Conversation d'exemple : vue du parent (fil th1), de l'élève (th9) et de l'enseignant (th6).
-    for (const [threadId, me, other] of [['th1', 'parent', 'enseignant'], ['th9', 'eleve', 'enseignant'], ['th6', 'enseignant', 'parent']] as const) {
-      await tx.insert(t.messages).values(CONVERSATION.map((m, i) => ({ threadId, clientId: `seed-${threadId}-${i}`, senderRole: m.mine ? me : other, text: m.text, image: !!m.image, time: m.time })));
-    }
+    // Messagerie : de vraies conversations entre les comptes de démonstration (parent, élève, enseignant, direction).
+    const TEACHER_ID = DEMO_USERS.enseignant.id; const DIRECTOR_ID = DEMO_USERS.etablissement.id;
+    const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000);
+    const conversation = async (c: { uniqueKey: string; kind: string; audience?: string; classId?: string; members?: string[] }, lines: [string, number, string][], reads: Record<string, number> = {}) => {
+      const [conv] = await tx.insert(t.conversations).values({ id: `cv-${c.uniqueKey.replace(/[^a-z0-9]+/gi, '-')}`, schoolId: S, kind: c.kind, audience: c.audience ?? null, classId: c.classId ?? null, uniqueKey: c.uniqueKey, createdBy: lines[0] ? lines[0][0] : null, lastMessageAt: minutesAgo(Math.min(...lines.map((l) => l[1]))) }).returning();
+      if (c.members?.length) await tx.insert(t.conversationMembers).values(c.members.map((userId) => ({ conversationId: conv!.id, userId })));
+      const ids: number[] = [];
+      for (const [i, [sender, ago, text]] of lines.entries()) {
+        const [m] = await tx.insert(t.conversationMessages).values({ conversationId: conv!.id, clientId: `seed-${conv!.id}-${i}`, senderId: sender, senderRole: sender === PARENT_ID ? 'parent' : sender === STUDENT_ID ? 'eleve' : sender === DIRECTOR_ID ? 'etablissement' : 'enseignant', text, createdAt: minutesAgo(ago) }).returning({ id: t.conversationMessages.id });
+        ids.push(m!.id);
+      }
+      // Curseurs de lecture : « jusqu'au n-ième message » pour chaque lecteur indiqué ; les autres messages restent non lus.
+      for (const [userId, upTo] of Object.entries(reads)) if (upTo > 0) await tx.insert(t.conversationReads).values({ conversationId: conv!.id, userId, lastReadMessageId: ids[upTo - 1]! });
+    };
+    await conversation({ uniqueKey: `pm:${[PARENT_ID, TEACHER_ID].sort().join('|')}`, kind: 'private', members: [PARENT_ID, TEACHER_ID] }, [
+      [TEACHER_ID, 190, CONVERSATION[0]!.text!], [PARENT_ID, 160, CONVERSATION[1]!.text!], [TEACHER_ID, 148, CONVERSATION[3]!.text!],
+    ], { [PARENT_ID]: 2, [TEACHER_ID]: 3 });
+    await conversation({ uniqueKey: `pm:${[STUDENT_ID, TEACHER_ID].sort().join('|')}`, kind: 'private', members: [STUDENT_ID, TEACHER_ID] }, [
+      [STUDENT_ID, 200, 'Bonjour Monsieur, je n’ai pas compris l’exercice 7 sur les fractions.'], [TEACHER_ID, 175, 'Bonjour, nous le reprendrons demain en début de cours.'],
+    ], { [STUDENT_ID]: 1, [TEACHER_ID]: 2 });
+    await conversation({ uniqueKey: 'class:3b:students', kind: 'class', audience: 'students', classId: '3b' }, [[TEACHER_ID, 300, 'Évaluation demain sur le chapitre 3. Pensez à réviser.']], { [TEACHER_ID]: 1 });
+    await conversation({ uniqueKey: 'class:3b:parents', kind: 'class', audience: 'parents', classId: '3b' }, [[TEACHER_ID, 295, 'Annonce : évaluation de mathématiques demain, chapitre 3.']], { [TEACHER_ID]: 1 });
+    await conversation({ uniqueKey: `school:${S}`, kind: 'school' }, [[DIRECTOR_ID, 1500, 'Merci de saisir les notes du 1er trimestre avant vendredi.']], { [DIRECTOR_ID]: 1 });
+    await conversation({ uniqueKey: `admin:${S}:${PARENT_ID}`, kind: 'private', audience: 'administration', members: [PARENT_ID] }, [
+      [PARENT_ID, 1700, 'Bonjour, quand aura lieu la réunion parents-professeurs ?'], [DIRECTOR_ID, 1500, 'Réunion parents-professeurs le 20 novembre, à 17 h.'],
+    ], { [PARENT_ID]: 1, [DIRECTOR_ID]: 2 });
 
     // 4. Collège Bessieux : un second établissement, distinct, pour montrer et tester le cloisonnement.
     const B = SECOND_SCHOOL_ID; const D = SECOND_SCHOOL_DATA;

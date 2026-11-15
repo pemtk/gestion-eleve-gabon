@@ -151,11 +151,16 @@ describe('Isolation entre établissements', () => {
     await db.insert(users).values({ id: 'u-parent-b', phone: '06998877', name: 'Parent Bessieux', initials: 'PB', role: 'parent', title: 'Parent', passwordHash: hashPassword(DEMO_PASSWORD), activated: true, schoolId: SECOND_SCHOOL_ID });
     const parentB = (await c.api().post('/auth/login').send({ mode: 'password', phone: '06998877', password: DEMO_PASSWORD }).expect(201)).body.accessToken;
     expect((await get('/threads', parentB).expect(200)).body).toEqual([]);
-    await get('/threads/th1/messages', parentB).expect(404);
-    await post('/threads/th1/messages', parentB, { text: 'intrusion', clientId: 'x-1' }).expect(404);
-    // le parent de A voit toujours son fil
     const parentA = await c.token('parent');
-    expect((await get('/threads/th1/messages', parentA).expect(200)).body.map((m: { text: string }) => m.text)).not.toContain('intrusion');
+    const threads = (await get('/threads', parentA).expect(200)).body as { id: string }[];
+    expect(threads.length).toBeGreaterThan(0);
+    for (const t of threads) {
+      await get(`/threads/${t.id}/messages`, parentB).expect(404);
+      await post(`/threads/${t.id}/messages`, parentB, { text: 'intrusion', clientId: 'x-1' }).expect(404);
+      await post(`/threads/${t.id}/read`, parentB, {}).expect(404);
+    }
+    // le parent de A voit toujours ses fils, sans le message de l'intrus
+    for (const t of threads) expect((await get(`/threads/${t.id}/messages`, parentA).expect(200)).body.map((m: { text: string }) => m.text)).not.toContain('intrusion');
   });
 
   it('les préférences, récompenses et lectures de notifications sont personnelles', async () => {

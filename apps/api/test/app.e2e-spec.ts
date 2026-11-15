@@ -91,9 +91,10 @@ describe('API (e2e, PostgreSQL)', () => {
   it('rend l’envoi de message idempotent (file hors ligne)', async () => {
     const parent = await token_('parent');
     const msg = { text: 'Bonjour', clientId: 'c-1' };
-    await api_().post('/threads/th1/messages').set(as_(parent)).send(msg).expect(201);
-    await api_().post('/threads/th1/messages').set(as_(parent)).send(msg).expect(201);
-    const list = await api_().get('/threads/th1/messages').set(as_(parent)).expect(200);
+    const thread = (await api_().get('/threads').set(as_(parent)).expect(200)).body.find((t: { name: string }) => t.name === 'Administration').id;
+    await api_().post(`/threads/${thread}/messages`).set(as_(parent)).send(msg).expect(201);
+    await api_().post(`/threads/${thread}/messages`).set(as_(parent)).send(msg).expect(201);
+    const list = await api_().get(`/threads/${thread}/messages`).set(as_(parent)).expect(200);
     expect(list.body.filter((m: { id: string }) => m.id === 'c-1')).toHaveLength(1);
   });
 });

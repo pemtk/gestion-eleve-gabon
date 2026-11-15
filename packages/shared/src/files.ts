@@ -24,7 +24,7 @@ export const FILE_POLICIES: Record<FileKind, FilePolicy> = {
   /** Photo ou document joint à un compte-rendu de visite (§8.3). */
   report: { label: 'Pièce jointe du compte-rendu', maxBytes: 10 * MB, types: [...IMAGE_TYPES, 'application/pdf'], roles: ['agent'] },
   /** Image d'un message (§3.3 : « une image simple »). */
-  message: { label: 'Image de message', maxBytes: 3 * MB, types: IMAGE_TYPES, roles: ['eleve', 'parent', 'enseignant'] },
+  message: { label: 'Image de message', maxBytes: 3 * MB, types: IMAGE_TYPES, roles: ['eleve', 'parent', 'enseignant', 'etablissement'] },
 };
 
 /** Taille la plus grande tous usages confondus : plafond de lecture d'un envoi. */

@@ -1,1 +1,1 @@
-export { Messages as default } from '@/screens/shared';
+export { MessagesScreen as default } from '@/features/messaging';
