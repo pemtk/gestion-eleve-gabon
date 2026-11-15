@@ -9,23 +9,22 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { and, eq, ne, sql } from 'drizzle-orm';
-import { BADGES, POINTS_HISTORY, selfEvaluationSchema } from '@sge/shared';
+import { and, eq, ne } from 'drizzle-orm';
+import { DAILY_GOAL, POINTS_PER_TASK, selfEvaluationSchema } from '@sge/shared';
 import { z } from 'zod';
 import { CurrentUser, Roles, schoolOf, type AuthUser } from '../common/auth.js';
 import { DB, type Db } from '../db/db.module.js';
 import { FilesService } from '../files/files.service.js';
-import { learner, taskCompletions, tasks, workSessions } from '../db/schema.js';
+import { taskCompletions, tasks, workSessions } from '../db/schema.js';
+import { GamificationService } from './gamification.service.js';
 import {
   completionsOf,
   studentOf,
   taskStatusOf,
   tasksOfClass,
 } from './context.js';
-import { getLearner } from './learner.js';
 import { overallAverage, recentGrades, subjectResults } from './results.js';
 
-const POINTS_PER_TASK = 20;
 /** Seuil sous lequel une complétion est signalée à l'enseignant (§4.3 : peut être invalidée). */
 const MIN_SECONDS = 60;
 /** `proofFileId` : photo envoyée au préalable (`POST /files`, usage « proof »). L'indicateur `proof` du client n'est plus cru : seule la photo compte. */
@@ -40,6 +39,7 @@ export class StudentController {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly files: FilesService,
+    private readonly gamification: GamificationService,
   ) {}
 
   /** Tâches de la classe de l'élève, chacune avec son statut personnel. */
@@ -67,8 +67,10 @@ export class StudentController {
 
   @Get('home')
   async home(@CurrentUser() user: AuthUser) {
-    const l = await getLearner(this.db, user.sub);
     const me = await studentOf(this.db, user);
+    const l = me
+      ? await this.gamification.stats(me.id)
+      : { points: 0, streak: 0, doneToday: 0 };
     const subjects = me
       ? await subjectResults(this.db, me.schoolId, me.id, 'T1')
       : [];
@@ -76,7 +78,7 @@ export class StudentController {
       points: l.points,
       streak: l.streak,
       doneToday: l.doneToday,
-      dailyGoal: 4,
+      dailyGoal: DAILY_GOAL,
       todayTasks: (await this.myTasks(user))
         .filter((t) => t.due.startsWith('Aujourd’hui'))
         .slice(0, 3),
@@ -142,7 +144,6 @@ export class StudentController {
       throw new BadRequestException(
         'La photo du devoir est obligatoire pour valider cette tâche.',
       );
-    await getLearner(this.db, user.sub);
     return this.db.transaction(async (tx) => {
       const [c] = await tx
         .insert(taskCompletions)
@@ -194,23 +195,20 @@ export class StudentController {
       await tx
         .insert(workSessions)
         .values({ userId: user.sub, seconds: body.seconds });
-      const entry = JSON.stringify([
-        { label: t.title, when: 'Aujourd’hui', points: `+${POINTS_PER_TASK}` },
-      ]);
-      const [l] = await tx
-        .update(learner)
-        .set({
-          points: sql`${learner.points} + ${POINTS_PER_TASK}`,
-          streak: sql`case when ${learner.doneToday} = 0 then ${learner.streak} + 1 else ${learner.streak} end`,
-          doneToday: sql`${learner.doneToday} + 1`,
-          history: sql`${entry}::jsonb || ${learner.history}`,
-        })
-        .where(eq(learner.userId, user.sub))
-        .returning();
+      const { stats, newBadges } = await this.gamification.afterCompletion(
+        tx,
+        me.schoolId,
+        me.id,
+      );
       return {
         gained: POINTS_PER_TASK,
-        points: l!.points,
-        streak: l!.streak,
+        points: stats.points,
+        streak: stats.streak,
+        newBadges: newBadges.map((b) => ({
+          id: b.id,
+          icon: b.icon,
+          label: b.label,
+        })),
         flaggedForReview: body.seconds < MIN_SECONDS,
         message:
           body.evaluation === 'doubt'
@@ -232,14 +230,14 @@ export class StudentController {
     return { trimester, average: overallAverage(subjects), subjects };
   }
 
+  /** Points, série, badges (obtenus et en cours) et historique des points. */
   @Get('trophies')
   async trophies(@CurrentUser() user: AuthUser) {
-    const l = await getLearner(this.db, user.sub);
-    return {
-      points: l.points,
-      streak: l.streak,
-      badges: BADGES,
-      history: [...l.history, ...POINTS_HISTORY],
-    };
+    const me = await studentOf(this.db, user);
+    if (!me)
+      return { points: 0, streak: 0, bestStreak: 0, badges: [], history: [] };
+    const { points, streak, bestStreak, badges, history } =
+      await this.gamification.summary(me.schoolId, me.id);
+    return { points, streak, bestStreak, badges, history };
   }
 }

@@ -7,3 +7,4 @@ export * from './plans.js';
 export * from './csv.js';
 export * from './files.js';
 export * from './indicators.js';
+export * from './gamification.js';

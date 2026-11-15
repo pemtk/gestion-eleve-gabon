@@ -1,6 +1,5 @@
 import type {
   BarRow,
-  Badge,
   ConfidentialCase,
   DashboardData,
   GradeNote,
@@ -472,22 +471,6 @@ export const SUBJECT_GRADES: SubjectGrades[] = [
   },
 ];
 export const OVERALL_AVERAGE = 13.8;
-
-export const BADGES: Badge[] = [
-  { icon: 'footprints', label: 'Premier pas', earned: true },
-  { icon: 'flame', label: 'Série de 5 jours', earned: true },
-  { icon: 'book-open', label: 'Lecteur assidu', earned: true },
-  { icon: 'target', label: '10 tâches terminées', earned: true },
-  { icon: 'star', label: 'Série de 10 jours', earned: false },
-  { icon: 'trophy', label: '2 000 points', earned: false },
-];
-export const POINTS_HISTORY = [
-  { label: 'Les neuf provinces du Gabon', when: 'Aujourd’hui', points: '+15' },
-  { label: 'Lecture du chapitre 2', when: 'Hier', points: '+20' },
-  { label: 'Série de 5 jours', when: 'Hier', points: '+50' },
-  { label: 'Le théorème de Thalès', when: 'Lundi', points: '+15' },
-];
-export const STUDENT_START = { points: 1240, streak: 5, doneToday: 2, dailyGoal: 4 };
 
 /* ---- Parent ---- */
 export const WEEK_MINUTES = [

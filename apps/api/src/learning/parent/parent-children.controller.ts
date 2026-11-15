@@ -26,7 +26,7 @@ import {
   tasks,
   workSessions,
 } from '../../db/schema.js';
-import { getLearner } from '../learner.js';
+import { GamificationService } from '../gamification.service.js';
 import { dateLabel, recentGrades, subjectResults } from '../results.js';
 import { ParentChildrenService } from './parent-children.service.js';
 
@@ -42,6 +42,7 @@ export class ParentChildrenController {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly family: ParentChildrenService,
+    private readonly gamification: GamificationService,
   ) {}
 
   /** Accueil : une phrase d'état par enfant (« Tout va bien… » ou l'absence non justifiée). */
@@ -68,8 +69,8 @@ export class ParentChildrenController {
         let status = 'Aucune activité enregistrée pour l’instant.';
         if (absence)
           status = `Absent le ${dateLabel(absence.date).replace(/\.$/, '')}. Justifiez ou écrivez à l’école.`;
-        else if (s.userId) {
-          const l = await getLearner(this.db, s.userId);
+        else {
+          const l = await this.gamification.stats(s.id);
           status = `Tout va bien. ${l.doneToday} tâche${l.doneToday > 1 ? 's' : ''} faite${l.doneToday > 1 ? 's' : ''} aujourd’hui.`;
         }
         return {
@@ -89,9 +90,7 @@ export class ParentChildrenController {
   @Get('children/:id')
   async child(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     const { s, className, school } = await this.family.kid(user.sub, id);
-    const l = s.userId
-      ? await getLearner(this.db, s.userId)
-      : { points: 0, streak: 0, doneToday: 0 };
+    const l = await this.gamification.stats(s.id);
     const classTasks = await this.db
       .select({ id: tasks.id })
       .from(tasks)

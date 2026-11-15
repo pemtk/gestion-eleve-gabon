@@ -81,7 +81,7 @@ describe('Base de données PostgreSQL', () => {
       .get('/me/student/trophies')
       .set(c.as(t))
       .expect(200);
-    expect(trophies.body.points).toBe(1260); // 1240 + 20, pas davantage
+    expect(trophies.body.points).toBe(60); // 40 déjà acquis + 20, pas davantage
   });
 
   it('n’enregistre qu’un message pour un même clientId, même envoyé en parallèle', async () => {

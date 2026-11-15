@@ -10,7 +10,7 @@ import {
 } from '@sge/shared';
 import { hashPassword } from '../src/auth/password.js';
 import { tasks, userScopes, users } from '../src/db/schema.js';
-import { client, createApp, dbOf, reset } from './helpers.js';
+import { client, createApp, createUser, dbOf, reset } from './helpers.js';
 
 /**
  * Cloisonnement entre établissements : deux écoles (Lycée Léon Mba = o2, Collège Bessieux = o6) partagent la
@@ -529,5 +529,18 @@ describe('Isolation entre établissements', () => {
     ).body as { id: string };
     await c.api().get(`/files/${mine.id}`).set(c.as(b)).expect(200);
     await c.api().get(`/files/${mine.id}`).set(c.as(a)).expect(404);
+  });
+
+  it('les badges d’un élève ne sont jamais visibles depuis un autre établissement', async () => {
+    const eleve = await c.token('eleve');
+    await get('/me/student/trophies', eleve).expect(200); // attribue « Premier pas » à Aïcha (école A)
+    const other = await createUser(app, {
+      id: 'u-eleve-b',
+      phone: '06000042',
+      role: 'eleve',
+      schoolId: SECOND_SCHOOL_ID,
+    });
+    const body = (await get('/me/student/trophies', other).expect(200)).body;
+    expect(body).toMatchObject({ points: 0, badges: [], history: [] });
   });
 });
