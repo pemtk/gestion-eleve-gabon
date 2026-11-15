@@ -11,27 +11,39 @@ export function stripJpegMetadata(input: Buffer): Buffer {
   while (i + 4 <= input.length) {
     if (input[i] !== 0xff) break; // données inattendues : on garde le reste tel quel
     const marker = input[i + 1]!;
-    if (marker === 0xff) { i++; continue; } // octets de remplissage
+    if (marker === 0xff) {
+      i++;
+      continue;
+    } // octets de remplissage
     if (marker === 0xda || marker === 0xd9) break; // début des données image / fin
-    if (marker >= 0xd0 && marker <= 0xd7 || marker === 0x01) { out.push(input.subarray(i, i + 2)); i += 2; continue; }
+    if ((marker >= 0xd0 && marker <= 0xd7) || marker === 0x01) {
+      out.push(input.subarray(i, i + 2));
+      i += 2;
+      continue;
+    }
     const length = input.readUInt16BE(i + 2);
     const end = i + 2 + length;
     if (length < 2 || end > input.length) return input; // fichier tronqué ou illisible : on ne touche à rien
     const segment = input.subarray(i, end);
-    if (marker === 0xe1) orientation ??= exifOrientation(input.subarray(i + 4, end));
+    if (marker === 0xe1)
+      orientation ??= exifOrientation(input.subarray(i + 4, end));
     else if (marker !== 0xed && marker !== 0xfe) out.push(segment); // APP13 (IPTC) et COM retirés ; APP1 traité plus bas
     i = end;
   }
   const rest = input.subarray(i);
   const head = out[0]!;
   const kept = out.slice(1);
-  const exif = orientation && orientation > 1 && orientation <= 8 ? [minimalExif(orientation)] : [];
+  const exif =
+    orientation && orientation > 1 && orientation <= 8
+      ? [minimalExif(orientation)]
+      : [];
   return Buffer.concat([head, ...exif, ...kept, rest]);
 }
 
 /** Orientation (1 à 8) lue dans un segment EXIF, ou `null`. */
 export function exifOrientation(seg: Buffer): number | null {
-  if (seg.length < 14 || seg.subarray(0, 6).toString('latin1') !== 'Exif\0\0') return null;
+  if (seg.length < 14 || seg.subarray(0, 6).toString('latin1') !== 'Exif\0\0')
+    return null;
   const t = seg.subarray(6);
   const little = t.subarray(0, 2).toString('latin1') === 'II';
   const u16 = (o: number) => (little ? t.readUInt16LE(o) : t.readUInt16BE(o));

@@ -1,1 +1,1 @@
-export { Activite as default } from '@/screens/parent';
+export { ActivityScreen as default } from '@/features/parent';

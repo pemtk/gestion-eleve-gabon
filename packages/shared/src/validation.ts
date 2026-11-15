@@ -58,18 +58,27 @@ export const signupSchema = z.object({
 
 export const forgotSchema = z.object({
   phone: phoneSchema,
-  code: z.string().regex(/^\d{6}$/).optional(),
+  code: z
+    .string()
+    .regex(/^\d{6}$/)
+    .optional(),
   password: passwordSchema.optional(),
 });
 
 /** Définir un mot de passe quand le compte n'en a pas encore (compte créé par l'école, activé par SMS). */
 export const passwordSetSchema = z
   .object({ next: passwordSchema, confirm: z.string() })
-  .refine((v) => v.next === v.confirm, { path: ['confirm'], message: 'Les deux mots de passe ne sont pas identiques.' });
+  .refine((v) => v.next === v.confirm, {
+    path: ['confirm'],
+    message: 'Les deux mots de passe ne sont pas identiques.',
+  });
 
 export const passwordChangeSchema = z
   .object({ current: z.string().min(1), next: passwordSchema, confirm: z.string() })
-  .refine((v) => v.next === v.confirm, { path: ['confirm'], message: 'Les deux mots de passe ne sont pas identiques.' });
+  .refine((v) => v.next === v.confirm, {
+    path: ['confirm'],
+    message: 'Les deux mots de passe ne sont pas identiques.',
+  });
 
 export const TASK_TYPES = ['Cours', 'Exercice', 'Devoir'] as const;
 export type TaskType = (typeof TASK_TYPES)[number];
@@ -164,12 +173,18 @@ export const inviteSchema = z.object({
 
 export const linkChildSchema = z.object({
   mode: z.enum(['code', 'qr']),
-  code: z.string().regex(/^\d{6}$/).optional(),
+  code: z
+    .string()
+    .regex(/^\d{6}$/)
+    .optional(),
   relation: z.enum(['père', 'mère', 'tuteur', 'tutrice', 'autre']),
 });
 
 /** Responsable d'un établissement (compte de direction créé avec l'école, invité par SMS). */
-export const directorSchema = z.object({ name: z.string().trim().min(1, 'Le nom de la direction est obligatoire.'), phone: phoneSchema });
+export const directorSchema = z.object({
+  name: z.string().trim().min(1, 'Le nom de la direction est obligatoire.'),
+  phone: phoneSchema,
+});
 
 export const organizationSchema = z.object({
   type: z.enum(['École', 'Diocèse', 'Réseau']),
@@ -186,7 +201,11 @@ export const organizationSchema = z.object({
 });
 
 /** Premier administrateur de la plateforme (commande `admin:create`). */
-export const platformAdminSchema = z.object({ name: z.string().trim().min(1), phone: phoneSchema, password: passwordSchema });
+export const platformAdminSchema = z.object({
+  name: z.string().trim().min(1),
+  phone: phoneSchema,
+  password: passwordSchema,
+});
 
 export const PLANS = ['Essentiel', 'Standard', 'Réseau', 'Diocésain'] as const;
 export type Plan = (typeof PLANS)[number];
@@ -207,13 +226,23 @@ export const visitReportSchema = z.object({
   visibleToSchool: z.boolean().default(false),
 });
 
-export const rewardSchema = z.object({ label: z.string().trim().min(1), threshold: z.number().int().positive() });
+export const rewardSchema = z.object({
+  label: z.string().trim().min(1),
+  threshold: z.number().int().positive(),
+});
 
 export const schoolYearSchema = z.object({
   label: z.string().trim().min(1),
   start: z.string(),
   end: z.string(),
-  terms: z.array(z.object({ name: z.string(), start: z.string(), end: z.string(), coefficient: z.number().positive() })),
+  terms: z.array(
+    z.object({
+      name: z.string(),
+      start: z.string(),
+      end: z.string(),
+      coefficient: z.number().positive(),
+    }),
+  ),
 });
 
 export const classInputSchema = z.object({
@@ -223,14 +252,22 @@ export const classInputSchema = z.object({
 });
 
 /** Prochain état d'un signalement confidentiel (§11.2) : accusé → évaluation → plan d'action → clôture. */
-export const CASE_STEPS = ['Accusé de réception', 'Première évaluation', 'Plan d’action', 'Clôture'] as const;
+export const CASE_STEPS = [
+  'Accusé de réception',
+  'Première évaluation',
+  'Plan d’action',
+  'Clôture',
+] as const;
 export const caseEvaluationSchema = z.object({
   gravity: z.enum(['Faible', 'Modérée', 'Élevée']),
   measures: z.string().default(''),
   informDirector: z.boolean().default(false),
   informFamily: z.boolean().default(false),
 });
-export const caseCloseSchema = z.object({ summary: z.string().trim().min(1), directorAgreement: z.literal(true) });
+export const caseCloseSchema = z.object({
+  summary: z.string().trim().min(1),
+  directorAgreement: z.literal(true),
+});
 
 export type LoginInput = z.infer<typeof loginSchema>;
 export type SignupInput = z.infer<typeof signupSchema>;

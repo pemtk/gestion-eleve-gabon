@@ -1,1 +1,1 @@
-export { Recompenses as default } from '@/screens/parent';
+export { RewardsScreen as default } from '@/features/parent';

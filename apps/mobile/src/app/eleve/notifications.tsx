@@ -1,1 +1,1 @@
-export { Notifications as default } from '@/screens/shared';
+export { NotificationsScreen as default } from '@/features/account';

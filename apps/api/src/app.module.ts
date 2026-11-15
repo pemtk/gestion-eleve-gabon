@@ -4,7 +4,10 @@ import { StandardSchemaValidationPipe } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { DashboardService } from './dashboard/dashboard.service.js';
 import { IndicatorsService } from './indicators/indicators.service.js';
-import { FilesController, PayloadTooLargeFilter } from './files/files.controller.js';
+import {
+  FilesController,
+  PayloadTooLargeFilter,
+} from './files/files.controller.js';
 import { FilesService } from './files/files.service.js';
 import { AuditController } from './audit/audit.controller.js';
 import { AuditService } from './audit/audit.service.js';
@@ -13,7 +16,10 @@ import { AdminController } from './admin/admin.controller.js';
 import { AgentController } from './agent/agent.controller.js';
 import { AuthController } from './auth/auth.controller.js';
 import { AuthService } from './auth/auth.service.js';
-import { ACCESS_TTL_SECONDS, RefreshTokens } from './auth/refresh-tokens.service.js';
+import {
+  ACCESS_TTL_SECONDS,
+  RefreshTokens,
+} from './auth/refresh-tokens.service.js';
 import { RateLimiter } from './common/rate-limiter.js';
 import { SmsGateway } from './auth/sms.gateway.js';
 import { AuthGuard, RolesGuard } from './common/auth.js';
@@ -26,6 +32,8 @@ import { StudentController } from './learning/student.controller.js';
 import { TeacherController } from './learning/teacher.controller.js';
 import { ConversationsController } from './messaging/conversations.controller.js';
 import { ConversationsService } from './messaging/conversations.service.js';
+import { NavController } from './nav/nav.controller.js';
+import { NavService } from './nav/nav.service.js';
 import { MessagingController } from './messaging/messaging.controller.js';
 import { PartnerController } from './partner/partner.controller.js';
 import { PartnerService } from './partner/partner.service.js';
@@ -39,21 +47,57 @@ import { SchoolPolicy } from './school/school.policy.js';
 export function jwtSecret(): string {
   const secret = process.env.JWT_SECRET;
   if (secret) return secret;
-  if (process.env.NODE_ENV === 'production') throw new Error('JWT_SECRET est obligatoire en production.');
+  if (process.env.NODE_ENV === 'production')
+    throw new Error('JWT_SECRET est obligatoire en production.');
   return 'dev-only-secret-change-me';
 }
 
 @Global()
 @Module({
-  imports: [DbModule, JwtModule.register({ global: true, secret: jwtSecret(), signOptions: { expiresIn: ACCESS_TTL_SECONDS } })],
+  imports: [
+    DbModule,
+    JwtModule.register({
+      global: true,
+      secret: jwtSecret(),
+      signOptions: { expiresIn: ACCESS_TTL_SECONDS },
+    }),
+  ],
   controllers: [
-    HealthController, AuthController, DashboardController,
-    SchoolUsersController, SchoolConfigController, SchoolLifeController, SchoolSubscriptionController,
-    StudentController, ParentController, TeacherController, AccountController, MessagingController, ConversationsController,
-    AgentController, PartnerController, AdminController, AuditController, FilesController,
+    HealthController,
+    AuthController,
+    DashboardController,
+    SchoolUsersController,
+    SchoolConfigController,
+    SchoolLifeController,
+    SchoolSubscriptionController,
+    StudentController,
+    ParentController,
+    TeacherController,
+    AccountController,
+    MessagingController,
+    ConversationsController,
+    NavController,
+    AgentController,
+    PartnerController,
+    AdminController,
+    AuditController,
+    FilesController,
   ],
   providers: [
-    AuthService, SmsGateway, AccountsService, IndicatorsService, DashboardService, RateLimiter, RefreshTokens, AuditService, FilesService, ConversationsService, CasesService, SchoolPolicy, PartnerService,
+    AuthService,
+    SmsGateway,
+    AccountsService,
+    IndicatorsService,
+    DashboardService,
+    RateLimiter,
+    RefreshTokens,
+    AuditService,
+    FilesService,
+    ConversationsService,
+    NavService,
+    CasesService,
+    SchoolPolicy,
+    PartnerService,
     { provide: APP_FILTER, useClass: PayloadTooLargeFilter },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },

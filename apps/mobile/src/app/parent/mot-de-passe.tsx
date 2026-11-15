@@ -1,1 +1,1 @@
-export { MotDePasse as default } from '@/screens/shared';
+export { ChangePasswordScreen as default } from '@/features/account';

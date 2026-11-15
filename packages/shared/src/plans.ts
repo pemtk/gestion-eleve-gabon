@@ -17,6 +17,9 @@ export function planFeatureList(plan: Plan) {
   const lvl = planLevel(plan);
   return {
     included: PLAN_FEATURES.filter(([, min]) => min <= lvl).map(([label]) => label),
-    missing: PLAN_FEATURES.filter(([, min]) => min > lvl).map(([label, min]) => ({ label, needs: PLAN_ORDER[min] as Plan })),
+    missing: PLAN_FEATURES.filter(([, min]) => min > lvl).map(([label, min]) => ({
+      label,
+      needs: PLAN_ORDER[min] as Plan,
+    })),
   };
 }

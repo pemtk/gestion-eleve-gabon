@@ -1,10 +1,18 @@
 import Constants from 'expo-constants';
 
 /** Émulateur Android : http://10.0.2.2:3000/api ; appareil réel : l'adresse IP de la machine. */
-export const API_URL: string = process.env.EXPO_PUBLIC_API_URL ?? (Constants.expoConfig?.extra?.apiUrl as string | undefined) ?? 'http://localhost:3000/api';
+export const API_URL: string =
+  process.env.EXPO_PUBLIC_API_URL ??
+  (Constants.expoConfig?.extra?.apiUrl as string | undefined) ??
+  'http://localhost:3000/api';
 
 export class ApiError extends Error {
-  constructor(readonly status: number, message: string) { super(message); }
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 /** Réseau indisponible (≠ erreur métier) : l'action peut être gardée et rejouée. */
 export class NetworkError extends Error {}
@@ -14,26 +22,44 @@ let refreshToken: string | null = null;
 /** Appelés par la session : enregistrer les nouveaux jetons / retourner à la connexion quand la session est perdue. */
 let onTokens: (access: string, refresh: string) => void = () => undefined;
 let onExpired: () => void = () => undefined;
-export const setTokens = (access: string | null, refresh: string | null) => { token = access; refreshToken = refresh; };
+export const setTokens = (access: string | null, refresh: string | null) => {
+  token = access;
+  refreshToken = refresh;
+};
 export const getRefreshToken = () => refreshToken;
 /** En-tête d'authentification pour les images chargées par l'application (les fichiers ne sont jamais publics). */
-export const authHeader = (): Record<string, string> => (token ? { Authorization: `Bearer ${token}` } : {});
-export const onSession = (handlers: { tokens: typeof onTokens; expired: typeof onExpired }) => { onTokens = handlers.tokens; onExpired = handlers.expired; };
+export const authHeader = (): Record<string, string> =>
+  token ? { Authorization: `Bearer ${token}` } : {};
+export const onSession = (handlers: { tokens: typeof onTokens; expired: typeof onExpired }) => {
+  onTokens = handlers.tokens;
+  onExpired = handlers.expired;
+};
 
-async function send(method: string, path: string, body?: unknown, headers?: Record<string, string>) {
+async function send(
+  method: string,
+  path: string,
+  body?: unknown,
+  headers?: Record<string, string>,
+) {
   let res: Response;
   try {
     // Un envoi de fichier part en multipart : le Content-Type (avec sa frontière) est fixé par la plateforme.
     const multipart = body instanceof FormData;
     res = await fetch(`${API_URL}${path}`, {
       method,
-      headers: { ...(multipart ? {} : { 'Content-Type': 'application/json' }), ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers },
+      headers: {
+        ...(multipart ? {} : { 'Content-Type': 'application/json' }),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
+      },
       body: body === undefined ? undefined : multipart ? body : JSON.stringify(body),
     });
   } catch {
     throw new NetworkError('Pas de réseau.');
   }
-  const data = res.headers.get('content-type')?.includes('json') ? await res.json() : await res.text();
+  const data = res.headers.get('content-type')?.includes('json')
+    ? await res.json()
+    : await res.text();
   return { res, data };
 }
 
@@ -45,25 +71,40 @@ function renew(): Promise<boolean> {
     try {
       const { res, data } = await send('POST', '/auth/refresh', { refreshToken });
       if (!res.ok) return false;
-      token = data.accessToken; refreshToken = data.refreshToken;
+      token = data.accessToken;
+      refreshToken = data.refreshToken;
       onTokens(data.accessToken, data.refreshToken);
       return true;
     } catch (e) {
       if (e instanceof NetworkError) throw e; // hors ligne : on garde la session
       return false;
     } finally {
-      setTimeout(() => { renewing = null; }, 0);
+      setTimeout(() => {
+        renewing = null;
+      }, 0);
     }
   })();
   return renewing;
 }
 
-export async function request<T>(method: string, path: string, body?: unknown, headers?: Record<string, string>): Promise<T> {
+export async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  headers?: Record<string, string>,
+): Promise<T> {
   let { res, data } = await send(method, path, body, headers);
   // Jeton d'accès expiré (15 min) : on le renouvelle en silence puis on rejoue la requête une fois.
-  if (res.status === 401 && token && !path.startsWith('/auth/') && await renew()) ({ res, data } = await send(method, path, body, headers));
+  if (res.status === 401 && token && !path.startsWith('/auth/') && (await renew()))
+    ({ res, data } = await send(method, path, body, headers));
   if (res.status === 401 && token && !path.startsWith('/auth/')) onExpired();
-  if (!res.ok) throw new ApiError(res.status, Array.isArray(data?.message) ? data.message.join(' · ') : (data?.message ?? 'Une erreur est survenue.'));
+  if (!res.ok)
+    throw new ApiError(
+      res.status,
+      Array.isArray(data?.message)
+        ? data.message.join(' · ')
+        : (data?.message ?? 'Une erreur est survenue.'),
+    );
   return data as T;
 }
 

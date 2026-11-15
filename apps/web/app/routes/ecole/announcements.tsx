@@ -3,30 +3,62 @@ import { useFetcher } from 'react-router';
 import { ANNOUNCE_TEMPLATES } from '@sge/shared';
 import { Icon } from '~/components/icon';
 import { PageHeader } from '~/components/blocks';
-import { Button, Chips, Field, FilePicker, Input, Notice, Section, Select, Textarea } from '~/components/ui';
+import {
+  Button,
+  Chips,
+  Field,
+  FilePicker,
+  Input,
+  Notice,
+  Section,
+  Select,
+  Textarea,
+} from '~/components/ui';
 import { run, spaceApi } from '~/lib/api.server';
 import { str } from '~/lib/form';
 import type { ClassRow } from '~/lib/types';
 import type { Route } from './+types/announcements';
 
-type Sent = { id: string; title: string; message: string; audience: string; target?: string; at: string; attachment: { id: string; name: string } | null };
+type Sent = {
+  id: string;
+  title: string;
+  message: string;
+  audience: string;
+  target?: string;
+  at: string;
+  attachment: { id: string; name: string } | null;
+};
 const AUDIENCES: Record<string, 'school' | 'level' | 'class' | 'teachers' | 'parents'> = {
-  'Toute l’école': 'school', 'Un niveau': 'level', 'Une classe': 'class', 'Les enseignants': 'teachers', 'Les parents': 'parents',
+  'Toute l’école': 'school',
+  'Un niveau': 'level',
+  'Une classe': 'class',
+  'Les enseignants': 'teachers',
+  'Les parents': 'parents',
 };
 
 export async function loader({ request }: Route.LoaderArgs) {
   const api = await spaceApi(request, 'ecole');
-  const [sent, classes] = await Promise.all([api.get<Sent[]>('/school/announcements'), api.get<ClassRow[]>('/school/classes')]);
+  const [sent, classes] = await Promise.all([
+    api.get<Sent[]>('/school/announcements'),
+    api.get<ClassRow[]>('/school/classes'),
+  ]);
   return { sent, classes };
 }
 
 export async function action({ request }: Route.ActionArgs) {
   const api = await spaceApi(request, 'ecole');
   const fd = await request.formData();
-  return run(async () => api.post('/school/announcements', {
-    title: str(fd, 'title') || undefined, message: str(fd, 'message'), audience: AUDIENCES[str(fd, 'audience')] ?? 'school',
-    target: str(fd, 'target') || undefined, attachmentFileId: await api.uploadIfAny(fd, 'file', 'attachment'),
-  }), 'Annonce envoyée. Les destinataires sont notifiés.');
+  return run(
+    async () =>
+      api.post('/school/announcements', {
+        title: str(fd, 'title') || undefined,
+        message: str(fd, 'message'),
+        audience: AUDIENCES[str(fd, 'audience')] ?? 'school',
+        target: str(fd, 'target') || undefined,
+        attachmentFileId: await api.uploadIfAny(fd, 'file', 'attachment'),
+      }),
+    'Annonce envoyée. Les destinataires sont notifiés.',
+  );
 }
 
 export default function Announcements({ loaderData: d }: Route.ComponentProps) {
@@ -43,36 +75,115 @@ export default function Announcements({ loaderData: d }: Route.ComponentProps) {
       {f.data && !f.data.ok && <Notice tone="error">{f.data.error}</Notice>}
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
         <Section title="Nouvelle annonce">
-          <f.Form method="post" encType="multipart/form-data" onSubmit={() => { setMessage(''); setTitle(''); }} className="flex flex-col gap-4">
+          <f.Form
+            method="post"
+            encType="multipart/form-data"
+            onSubmit={() => {
+              setMessage('');
+              setTitle('');
+            }}
+            className="flex flex-col gap-4"
+          >
             <input type="hidden" name="audience" value={audience} />
-            <Field label="Destinataires"><Chips name="aud" options={Object.keys(AUDIENCES)} value={audience} onChange={setAudience} /></Field>
+            <Field label="Destinataires">
+              <Chips
+                name="aud"
+                options={Object.keys(AUDIENCES)}
+                value={audience}
+                onChange={setAudience}
+              />
+            </Field>
             {needsTarget && (
               <Field label={audience === 'Une classe' ? 'Classe' : 'Niveau'}>
-                <Select name="target" required>{(audience === 'Une classe' ? d.classes.map((c) => c.name) : ['Primaire', 'Collège', 'Lycée']).map((o) => <option key={o}>{o}</option>)}</Select>
+                <Select name="target" required>
+                  {(audience === 'Une classe'
+                    ? d.classes.map((c) => c.name)
+                    : ['Primaire', 'Collège', 'Lycée']
+                  ).map((o) => (
+                    <option key={o}>{o}</option>
+                  ))}
+                </Select>
               </Field>
             )}
-            <Field label="Modèle"><Chips name="tpl" options={Object.keys(ANNOUNCE_TEMPLATES)} value="" onChange={(k) => setMessage(ANNOUNCE_TEMPLATES[k] ?? '')} /></Field>
-            <Field label="Titre"><Input name="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex. Évaluation de mathématiques" /></Field>
-            <Field label="Message"><Textarea name="message" rows={5} required value={message} onChange={(e) => setMessage(e.target.value)} /></Field>
-            <FilePicker name="file" kind="attachment" label="Joindre un document" onPick={setAttach} />
-            <Button type="submit" icon="send" disabled={f.state !== 'idle'}>Envoyer</Button>
+            <Field label="Modèle">
+              <Chips
+                name="tpl"
+                options={Object.keys(ANNOUNCE_TEMPLATES)}
+                value=""
+                onChange={(k) => setMessage(ANNOUNCE_TEMPLATES[k] ?? '')}
+              />
+            </Field>
+            <Field label="Titre">
+              <Input
+                name="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Ex. Évaluation de mathématiques"
+              />
+            </Field>
+            <Field label="Message">
+              <Textarea
+                name="message"
+                rows={5}
+                required
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+              />
+            </Field>
+            <FilePicker
+              name="file"
+              kind="attachment"
+              label="Joindre un document"
+              onPick={setAttach}
+            />
+            <Button type="submit" icon="send" disabled={f.state !== 'idle'}>
+              Envoyer
+            </Button>
           </f.Form>
         </Section>
         <div className="flex flex-col gap-5">
           <Section title="Aperçu">
             <div className="rounded-lg border border-divider p-4">
-              <div className="flex items-center gap-2 text-[12px] text-neutral-600"><Icon name="megaphone" size={14} className="text-accent-700" />École · {audience.toLowerCase()}</div>
-              <div className="mt-1 font-heading text-[22px] leading-tight font-semibold">{title || 'Sans titre'}</div>
-              <p className="mt-1 text-[14px] leading-relaxed text-neutral-800">{message || 'Votre message apparaîtra ici.'}</p>
-              {attach && <div className="mt-2 flex items-center gap-2 text-[13px] text-accent-800"><Icon name="paperclip" size={14} />{attach.name}</div>}
+              <div className="flex items-center gap-2 text-[12px] text-neutral-600">
+                <Icon name="megaphone" size={14} className="text-accent-700" />
+                École · {audience.toLowerCase()}
+              </div>
+              <div className="mt-1 font-heading text-[22px] leading-tight font-semibold">
+                {title || 'Sans titre'}
+              </div>
+              <p className="mt-1 text-[14px] leading-relaxed text-neutral-800">
+                {message || 'Votre message apparaîtra ici.'}
+              </p>
+              {attach && (
+                <div className="mt-2 flex items-center gap-2 text-[13px] text-accent-800">
+                  <Icon name="paperclip" size={14} />
+                  {attach.name}
+                </div>
+              )}
             </div>
           </Section>
           <Section title="Envoyées">
             {d.sent.map((s) => (
-              <div key={s.id} className="border-t border-divider py-2.5 text-[13.5px]"><div className="font-semibold">{s.title || 'Sans titre'}</div><div className="line-clamp-2 text-neutral-700">{s.message}</div>
-                {s.attachment && <a href={`/fichiers/${s.attachment.id}`} download className="mt-1 inline-flex items-center gap-1.5 text-[13px] text-accent-800"><Icon name="paperclip" size={13} />{s.attachment.name}</a>}</div>
+              <div key={s.id} className="border-t border-divider py-2.5 text-[13.5px]">
+                <div className="font-semibold">{s.title || 'Sans titre'}</div>
+                <div className="line-clamp-2 text-neutral-700">{s.message}</div>
+                {s.attachment && (
+                  <a
+                    href={`/fichiers/${s.attachment.id}`}
+                    download
+                    className="mt-1 inline-flex items-center gap-1.5 text-[13px] text-accent-800"
+                  >
+                    <Icon name="paperclip" size={13} />
+                    {s.attachment.name}
+                  </a>
+                )}
+              </div>
             ))}
-            {!d.sent.length && <p className="text-[13.5px] italic text-neutral-600">Aucune annonce envoyée pour l’instant.</p>}
+            {!d.sent.length && (
+              <p className="text-[13.5px] italic text-neutral-600">
+                Aucune annonce envoyée pour l’instant.
+              </p>
+            )}
           </Section>
         </div>
       </div>

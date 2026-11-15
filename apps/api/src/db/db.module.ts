@@ -1,4 +1,10 @@
-import { Global, Inject, Logger, Module, type OnApplicationShutdown } from '@nestjs/common';
+import {
+  Global,
+  Inject,
+  Logger,
+  Module,
+  type OnApplicationShutdown,
+} from '@nestjs/common';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { join } from 'node:path';
@@ -15,14 +21,24 @@ export const MIGRATIONS_DIR = join(import.meta.dirname, '..', '..', 'drizzle');
 
 export function databaseUrl(): string {
   const url = process.env.DATABASE_URL;
-  if (!url) throw new Error('DATABASE_URL est obligatoire (ex. postgres://sge:sge@localhost:5432/sge).');
+  if (!url)
+    throw new Error(
+      'DATABASE_URL est obligatoire (ex. postgres://sge:sge@localhost:5432/sge).',
+    );
   return url;
 }
 
 @Global()
 @Module({
   providers: [
-    { provide: POOL, useFactory: () => new pg.Pool({ connectionString: databaseUrl(), max: Number(process.env.DB_POOL_MAX ?? 10) }) },
+    {
+      provide: POOL,
+      useFactory: () =>
+        new pg.Pool({
+          connectionString: databaseUrl(),
+          max: Number(process.env.DB_POOL_MAX ?? 10),
+        }),
+    },
     {
       provide: DB,
       inject: [POOL],
@@ -35,11 +51,17 @@ export function databaseUrl(): string {
           log.log('Migrations appliquées.');
         }
         // Données de démonstration : jamais par défaut en production.
-        if (process.env.SEED_DEMO === 'true' || (process.env.SEED_DEMO !== 'false' && process.env.NODE_ENV !== 'production')) {
-          if (await seedDemo(db, { onlyIfEmpty: true })) log.log('Données de démonstration chargées.');
+        if (
+          process.env.SEED_DEMO === 'true' ||
+          (process.env.SEED_DEMO !== 'false' &&
+            process.env.NODE_ENV !== 'production')
+        ) {
+          if (await seedDemo(db, { onlyIfEmpty: true }))
+            log.log('Données de démonstration chargées.');
         }
         // Premier administrateur (déploiement sans base de démonstration).
-        if (await bootstrapAdmin(db)) log.log('Premier administrateur créé (BOOTSTRAP_ADMIN_*).');
+        if (await bootstrapAdmin(db))
+          log.log('Premier administrateur créé (BOOTSTRAP_ADMIN_*).');
         return db;
       },
     },

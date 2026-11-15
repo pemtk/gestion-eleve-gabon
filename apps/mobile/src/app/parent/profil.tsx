@@ -1,1 +1,1 @@
-export { ProfilEdit as default } from '@/screens/shared';
+export { EditProfileScreen as default } from '@/features/account';

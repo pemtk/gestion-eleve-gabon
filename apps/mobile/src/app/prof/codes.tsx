@@ -1,1 +1,1 @@
-export { Codes as default } from '@/screens/prof';
+export { ParentCodesScreen as default } from '@/features/teacher';

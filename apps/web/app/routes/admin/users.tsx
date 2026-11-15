@@ -17,14 +17,24 @@ export async function action({ request }: Route.ActionArgs) {
   const api = await spaceApi(request, 'admin');
   const fd = await request.formData();
   const role = str(fd, 'role') === 'Agent' ? 'agent' : 'partenaire';
-  return run(() => api.post('/admin/users/invite', { name: str(fd, 'name'), phone: str(fd, 'phone'), role, scopes: fd.getAll('scope').map(String) }), 'Invitation envoyée par email et SMS.');
+  return run(
+    () =>
+      api.post('/admin/users/invite', {
+        name: str(fd, 'name'),
+        phone: str(fd, 'phone'),
+        role,
+        scopes: fd.getAll('scope').map(String),
+      }),
+    'Invitation envoyée par email et SMS.',
+  );
 }
 
 export default function AdminUsers({ loaderData: d, actionData }: Route.ComponentProps) {
   const [role, setRole] = useState('Agent');
   const [scopes, setScopes] = useState<string[]>([]);
   const options = role === 'Agent' ? AGENT_SCOPES : PARTNER_SCOPES;
-  const toggle = (s: string) => setScopes((x) => (x.includes(s) ? x.filter((v) => v !== s) : [...x, s]));
+  const toggle = (s: string) =>
+    setScopes((x) => (x.includes(s) ? x.filter((v) => v !== s) : [...x, s]));
   return (
     <>
       <PageHeader kicker="Utilisateurs institutionnels" title="Agents et partenaires" />
@@ -33,18 +43,45 @@ export default function AdminUsers({ loaderData: d, actionData }: Route.Componen
         <Section title="Inviter">
           <Form method="post" className="flex flex-col gap-3.5">
             <input type="hidden" name="role" value={role} />
-            <Field label="Profil"><Chips name="role-ui" options={['Agent', 'Partenaire']} value={role} onChange={(r) => { setRole(r); setScopes([]); }} /></Field>
-            <Field label="Nom"><Input name="name" required /></Field>
-            <Field label="Téléphone"><Input name="phone" inputMode="tel" placeholder="+241 07 …" required /></Field>
-            <Field label={role === 'Agent' ? 'Écoles assignées' : 'Régions autorisées (données agrégées)'}>
+            <Field label="Profil">
+              <Chips
+                name="role-ui"
+                options={['Agent', 'Partenaire']}
+                value={role}
+                onChange={(r) => {
+                  setRole(r);
+                  setScopes([]);
+                }}
+              />
+            </Field>
+            <Field label="Nom">
+              <Input name="name" required />
+            </Field>
+            <Field label="Téléphone">
+              <Input name="phone" inputMode="tel" placeholder="+241 07 …" required />
+            </Field>
+            <Field
+              label={
+                role === 'Agent' ? 'Écoles assignées' : 'Régions autorisées (données agrégées)'
+              }
+            >
               <Chips name="scope-ui" multiple options={options} value={scopes} onChange={toggle} />
             </Field>
-            {scopes.map((s) => <input key={s} type="hidden" name="scope" value={s} />)}
-            <Button type="submit" icon="send" disabled={!scopes.length}>Inviter</Button>
+            {scopes.map((s) => (
+              <input key={s} type="hidden" name="scope" value={s} />
+            ))}
+            <Button type="submit" icon="send" disabled={!scopes.length}>
+              Inviter
+            </Button>
           </Form>
         </Section>
-        <DataGrid title="Utilisateurs" note={`${d.users.length} comptes`} columns="1.8fr .9fr 1.5fr 1fr" head={['Nom', 'Profil', 'Périmètre', 'Statut']}
-          rows={d.users.map((u) => [u.name, u.role, u.scope, <Cell key="s">{u.status}</Cell>])} />
+        <DataGrid
+          title="Utilisateurs"
+          note={`${d.users.length} comptes`}
+          columns="1.8fr .9fr 1.5fr 1fr"
+          head={['Nom', 'Profil', 'Périmètre', 'Statut']}
+          rows={d.users.map((u) => [u.name, u.role, u.scope, <Cell key="s">{u.status}</Cell>])}
+        />
       </div>
     </>
   );

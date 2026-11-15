@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
-  can, isPasswordValid, maskSmallCell, normalizePhone, passwordChangeSchema, passwordRules,
-  signupSchema, taskInputSchema, loginSchema, WEB_ROLES, MOBILE_ROLES, formatCode,
+  can,
+  isPasswordValid,
+  maskSmallCell,
+  normalizePhone,
+  passwordChangeSchema,
+  passwordRules,
+  signupSchema,
+  taskInputSchema,
+  loginSchema,
+  WEB_ROLES,
+  MOBILE_ROLES,
+  formatCode,
 } from './index.js';
 
 describe('mot de passe', () => {
@@ -10,10 +20,18 @@ describe('mot de passe', () => {
     expect(isPasswordValid('12345678')).toBe(false);
     expect(isPasswordValid('abc123')).toBe(false);
     expect(isPasswordValid('motdepasse1')).toBe(true);
-    expect(passwordRules('a1').filter((r) => !r.ok).map((r) => r.key)).toEqual(['length']);
+    expect(
+      passwordRules('a1')
+        .filter((r) => !r.ok)
+        .map((r) => r.key),
+    ).toEqual(['length']);
   });
   it('refuse une confirmation différente', () => {
-    const r = passwordChangeSchema.safeParse({ current: 'x', next: 'motdepasse1', confirm: 'motdepasse2' });
+    const r = passwordChangeSchema.safeParse({
+      current: 'x',
+      next: 'motdepasse1',
+      confirm: 'motdepasse2',
+    });
     expect(r.success).toBe(false);
   });
 });
@@ -26,7 +44,14 @@ describe('téléphone', () => {
   it('valide la connexion par mot de passe ou OTP', () => {
     expect(loginSchema.safeParse({ mode: 'otp', phone: '07 12 34 56' }).success).toBe(true);
     expect(loginSchema.safeParse({ mode: 'password', phone: '07 12 34 56' }).success).toBe(false);
-    expect(signupSchema.safeParse({ firstName: 'A', lastName: 'B', phone: '12', password: 'motdepasse1' }).success).toBe(false);
+    expect(
+      signupSchema.safeParse({
+        firstName: 'A',
+        lastName: 'B',
+        phone: '12',
+        password: 'motdepasse1',
+      }).success,
+    ).toBe(false);
   });
 });
 
@@ -39,7 +64,13 @@ describe('confidentialité', () => {
 
 describe('tâches', () => {
   it('exige un titre', () => {
-    const base = { classId: '3b', subject: 'Maths', type: 'Exercice', description: '', due: 'Demain' };
+    const base = {
+      classId: '3b',
+      subject: 'Maths',
+      type: 'Exercice',
+      description: '',
+      due: 'Demain',
+    };
     expect(taskInputSchema.safeParse({ ...base, title: '  ' }).success).toBe(false);
     expect(taskInputSchema.safeParse({ ...base, title: 'Fractions' }).success).toBe(true);
   });

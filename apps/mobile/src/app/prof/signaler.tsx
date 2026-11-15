@@ -1,1 +1,1 @@
-export { Signaler as default } from '@/screens/prof';
+export { ReportScreen as default } from '@/features/teacher';

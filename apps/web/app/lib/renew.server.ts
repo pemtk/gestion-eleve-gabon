@@ -8,7 +8,9 @@ type Renewal = { accessToken: string; refreshToken: string; user: SessionUser };
 /** Millisecondes avant l'expiration du jeton d'accès (lue dans sa charge, sans vérifier la signature : c'est l'API qui la vérifie). */
 function msLeft(token: string): number {
   try {
-    const { exp } = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString()) as { exp?: number };
+    const { exp } = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString()) as {
+      exp?: number;
+    };
     return exp ? exp * 1000 - Date.now() : 0;
   } catch {
     return 0;

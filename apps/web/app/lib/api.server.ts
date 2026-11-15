@@ -5,7 +5,11 @@ import { destroyUserSession, requireUser } from './session.server';
 const BASE = process.env.API_URL ?? 'http://localhost:3000/api';
 
 export class ApiError extends Error {
-  constructor(readonly status: number, message: string, readonly code?: string) {
+  constructor(
+    readonly status: number,
+    message: string,
+    readonly code?: string,
+  ) {
     super(message);
   }
 }
@@ -17,7 +21,10 @@ async function call<T>(method: string, path: string, token?: string, body?: unkn
     const multipart = body instanceof FormData;
     res = await fetch(`${BASE}${path}`, {
       method,
-      headers: { ...(multipart ? {} : { 'Content-Type': 'application/json' }), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      headers: {
+        ...(multipart ? {} : { 'Content-Type': 'application/json' }),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: body === undefined ? undefined : multipart ? body : JSON.stringify(body),
     });
   } catch {
@@ -26,7 +33,9 @@ async function call<T>(method: string, path: string, token?: string, body?: unkn
   const type = res.headers.get('content-type') ?? '';
   const payload = type.includes('json') ? await res.json() : await res.text();
   if (!res.ok) {
-    const message = Array.isArray(payload?.message) ? payload.message.join(' · ') : (payload?.message ?? 'Une erreur est survenue.');
+    const message = Array.isArray(payload?.message)
+      ? payload.message.join(' · ')
+      : (payload?.message ?? 'Une erreur est survenue.');
     throw new ApiError(res.status, message, payload?.code);
   }
   return payload as T;
@@ -67,23 +76,35 @@ export async function spaceApi(request: Request, space: WebSpace) {
     /** Réponse brute de l'API (téléchargement de fichier) : le jeton ne quitte pas le serveur. */
     raw: async (path: string) => {
       let res: Response;
-      try { res = await fetch(`${BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } }); } catch { throw new ApiError(503, 'Le serveur est injoignable. Réessayez dans un instant.'); }
+      try {
+        res = await fetch(`${BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+      } catch {
+        throw new ApiError(503, 'Le serveur est injoignable. Réessayez dans un instant.');
+      }
       if (res.status === 401) throw await destroyUserSession(request);
       return res;
     },
   };
 }
 
-export type ActionResult = { ok: true; message: string } | { ok: false; error: string; code?: string };
+export type ActionResult =
+  { ok: true; message: string } | { ok: false; error: string; code?: string };
 
 /** Exécute une mutation et la traduit en message (succès) ou erreur affichable. */
 export async function run<T>(fn: () => Promise<T>, success: string | ((result: T) => string)) {
   try {
     const result = await fn();
-    return data<ActionResult>({ ok: true, message: typeof success === 'function' ? success(result) : success });
+    return data<ActionResult>({
+      ok: true,
+      message: typeof success === 'function' ? success(result) : success,
+    });
   } catch (e) {
     if (e instanceof Response) throw e;
-    if (e instanceof ApiError) return data<ActionResult>({ ok: false, error: e.message, code: e.code }, { status: e.status });
+    if (e instanceof ApiError)
+      return data<ActionResult>(
+        { ok: false, error: e.message, code: e.code },
+        { status: e.status },
+      );
     throw e;
   }
 }

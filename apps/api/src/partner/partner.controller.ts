@@ -10,12 +10,21 @@ export class PartnerController {
 
   @Get('indicators')
   async indicators() {
-    return { threshold: PRIVACY_THRESHOLD, ...(await this.partner.nationalIndicators()) };
+    return {
+      threshold: PRIVACY_THRESHOLD,
+      ...(await this.partner.nationalIndicators()),
+    };
   }
 
   @Get('provinces')
-  async provinces(@Query('region') region = 'Toutes', @Query('level') level = 'Tous') {
-    return { threshold: PRIVACY_THRESHOLD, rows: await this.partner.provinces(region, level) };
+  async provinces(
+    @Query('region') region = 'Toutes',
+    @Query('level') level = 'Tous',
+  ) {
+    return {
+      threshold: PRIVACY_THRESHOLD,
+      rows: await this.partner.provinces(region, level),
+    };
   }
 
   @Get('reports')
@@ -27,6 +36,8 @@ export class PartnerController {
   @Get('export.csv')
   @Header('Content-Type', 'text/csv; charset=utf-8')
   export(@Query('dataset') dataset?: string) {
-    return this.partner.exportCsv(dataset === 'provinces' ? 'provinces' : 'signalements');
+    return this.partner.exportCsv(
+      dataset === 'provinces' ? 'provinces' : 'signalements',
+    );
   }
 }

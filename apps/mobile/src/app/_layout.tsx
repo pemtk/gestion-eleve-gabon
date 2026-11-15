@@ -1,5 +1,14 @@
-import { CormorantGaramond_400Regular, CormorantGaramond_400Regular_Italic, CormorantGaramond_600SemiBold } from '@expo-google-fonts/cormorant-garamond';
-import { Lora_400Regular, Lora_400Regular_Italic, Lora_600SemiBold, useFonts } from '@expo-google-fonts/lora';
+import {
+  CormorantGaramond_400Regular,
+  CormorantGaramond_400Regular_Italic,
+  CormorantGaramond_600SemiBold,
+} from '@expo-google-fonts/cormorant-garamond';
+import {
+  Lora_400Regular,
+  Lora_400Regular_Italic,
+  Lora_600SemiBold,
+  useFonts,
+} from '@expo-google-fonts/lora';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -30,8 +39,12 @@ function Gate({ fontsReady }: { fontsReady: boolean }) {
 export default function RootLayout() {
   // Cormorant Garamond (titres) et Lora (texte), comme le système Classical.
   const [loaded] = useFonts({
-    CormorantGaramond_400Regular, CormorantGaramond_400Regular_Italic, CormorantGaramond_600SemiBold,
-    Lora_400Regular, Lora_400Regular_Italic, Lora_600SemiBold,
+    CormorantGaramond_400Regular,
+    CormorantGaramond_400Regular_Italic,
+    CormorantGaramond_600SemiBold,
+    Lora_400Regular,
+    Lora_400Regular_Italic,
+    Lora_600SemiBold,
   });
   return (
     <SafeAreaProvider>

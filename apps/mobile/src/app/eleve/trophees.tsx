@@ -1,1 +1,1 @@
-export { Trophees as default } from '@/screens/eleve';
+export { TrophiesScreen as default } from '@/features/student';

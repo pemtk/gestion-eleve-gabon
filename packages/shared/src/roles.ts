@@ -51,7 +51,16 @@ export const ROLE_OF_SPACE: Record<WebSpace, Role> = {
   admin: 'admin',
 };
 
-export type Access = 'oui' | 'non' | 'soi' | 'ses-enfants' | 'sa-classe' | 'agrege' | 'ouvrir' | 'traiter' | 'metadonnees';
+export type Access =
+  | 'oui'
+  | 'non'
+  | 'soi'
+  | 'ses-enfants'
+  | 'sa-classe'
+  | 'agrege'
+  | 'ouvrir'
+  | 'traiter'
+  | 'metadonnees';
 
 export type Capability =
   | 'tasks.read'
@@ -67,13 +76,69 @@ const N: Access = 'non';
 
 /** Annexe 13.2 — « Droits d'accès par profil ». */
 export const ACCESS_MATRIX: Record<Capability, Record<Role, Access>> = {
-  'tasks.read': { eleve: O, parent: N, enseignant: 'sa-classe', etablissement: O, agent: N, partenaire: N, admin: N },
-  'activity.read': { eleve: 'soi', parent: 'ses-enfants', enseignant: 'sa-classe', etablissement: O, agent: 'agrege', partenaire: 'agrege', admin: 'agrege' },
-  'grades.read': { eleve: 'soi', parent: 'ses-enfants', enseignant: 'sa-classe', etablissement: O, agent: 'agrege', partenaire: 'agrege', admin: N },
-  'tasks.write': { eleve: N, parent: N, enseignant: 'sa-classe', etablissement: O, agent: N, partenaire: N, admin: N },
-  'grades.write': { eleve: N, parent: N, enseignant: O, etablissement: O, agent: N, partenaire: N, admin: N },
-  'reports.confidential': { eleve: N, parent: 'ouvrir', enseignant: 'ouvrir', etablissement: 'traiter', agent: N, partenaire: N, admin: 'metadonnees' },
-  'subscriptions.manage': { eleve: N, parent: N, enseignant: N, etablissement: N, agent: N, partenaire: N, admin: O },
+  'tasks.read': {
+    eleve: O,
+    parent: N,
+    enseignant: 'sa-classe',
+    etablissement: O,
+    agent: N,
+    partenaire: N,
+    admin: N,
+  },
+  'activity.read': {
+    eleve: 'soi',
+    parent: 'ses-enfants',
+    enseignant: 'sa-classe',
+    etablissement: O,
+    agent: 'agrege',
+    partenaire: 'agrege',
+    admin: 'agrege',
+  },
+  'grades.read': {
+    eleve: 'soi',
+    parent: 'ses-enfants',
+    enseignant: 'sa-classe',
+    etablissement: O,
+    agent: 'agrege',
+    partenaire: 'agrege',
+    admin: N,
+  },
+  'tasks.write': {
+    eleve: N,
+    parent: N,
+    enseignant: 'sa-classe',
+    etablissement: O,
+    agent: N,
+    partenaire: N,
+    admin: N,
+  },
+  'grades.write': {
+    eleve: N,
+    parent: N,
+    enseignant: O,
+    etablissement: O,
+    agent: N,
+    partenaire: N,
+    admin: N,
+  },
+  'reports.confidential': {
+    eleve: N,
+    parent: 'ouvrir',
+    enseignant: 'ouvrir',
+    etablissement: 'traiter',
+    agent: N,
+    partenaire: N,
+    admin: 'metadonnees',
+  },
+  'subscriptions.manage': {
+    eleve: N,
+    parent: N,
+    enseignant: N,
+    etablissement: N,
+    agent: N,
+    partenaire: N,
+    admin: O,
+  },
 };
 
 export function can(role: Role, capability: Capability): boolean {

@@ -10,5 +10,7 @@ export function verifyPassword(password: string, stored: string): boolean {
   if (!salt || !hash) return false;
   const candidate = scryptSync(password, salt, 32);
   const expected = Buffer.from(hash, 'hex');
-  return candidate.length === expected.length && timingSafeEqual(candidate, expected);
+  return (
+    candidate.length === expected.length && timingSafeEqual(candidate, expected)
+  );
 }

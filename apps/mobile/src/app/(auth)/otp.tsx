@@ -1,1 +1,1 @@
-export { Otp as default } from '@/screens/auth';
+export { OtpScreen as default } from '@/features/auth';

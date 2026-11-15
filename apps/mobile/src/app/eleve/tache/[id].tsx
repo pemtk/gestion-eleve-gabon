@@ -1,1 +1,1 @@
-export { Tache as default } from '@/screens/eleve';
+export { TaskDetailScreen as default } from '@/features/student';

@@ -1,1 +1,1 @@
-export { Appel as default } from '@/screens/prof';
+export { AttendanceScreen as default } from '@/features/teacher';

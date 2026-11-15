@@ -9,18 +9,51 @@
     font-size: 15px;
     line-height: 1.55;
   }
-  h1, h2, h3, h4 {
+  h1,
+  h2,
+  h3,
+  h4 {
     font-family: var(--font-heading);
     font-weight: 600;
     letter-spacing: -0.015em;
     line-height: 1.12;
   }
-  a { color: var(--color-accent-700); text-underline-offset: 3px; }
-  a:hover { color: var(--color-accent-800); }
-  :focus { outline: none; }
-  :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
-  ::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
-  input, select, textarea, button { font: inherit; }
-  button:disabled { opacity: 0.45; cursor: not-allowed; }
-  .tnum { font-variant-numeric: tabular-nums; }
+  a {
+    color: var(--color-accent-700);
+    text-underline-offset: 3px;
+  }
+  a:hover {
+    color: var(--color-accent-800);
+  }
+  :focus {
+    outline: none;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  }
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+  }
+  button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  /* Cormorant Garamond a des chiffres « elzéviriens » (le 1 ressemble à un I) : on garde les chiffres alignés sur la ligne. */
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-heading {
+    font-variant-numeric: lining-nums;
+  }
+  .tnum {
+    font-variant-numeric: lining-nums tabular-nums;
+  }
 }

@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { Form, redirect, useNavigation } from 'react-router';
-import { ROLE_LABELS, WEB_HOME, WEB_ROLES, WEB_SPACE_OF, type Role, type SessionUser } from '@sge/shared';
+import {
+  ROLE_LABELS,
+  WEB_HOME,
+  WEB_ROLES,
+  WEB_SPACE_OF,
+  type Role,
+  type SessionUser,
+} from '@sge/shared';
 import { Icon } from '~/components/icon';
 import { Button, Chips, Field, Input, Notice, Kicker, cx } from '~/components/ui';
 import { ApiError, publicApi } from '~/lib/api.server';
@@ -9,7 +16,8 @@ import { createUserSession, getSession } from '~/lib/session.server';
 import type { Route } from './+types/login';
 
 type Session = { accessToken: string; refreshToken: string; user: SessionUser };
-const demoEnabled = () => process.env.NODE_ENV !== 'production' || process.env.DEMO_LOGIN === 'true';
+const demoEnabled = () =>
+  process.env.NODE_ENV !== 'production' || process.env.DEMO_LOGIN === 'true';
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = (await getSession(request)).get('user');
@@ -26,20 +34,37 @@ export async function action({ request }: Route.ActionArgs) {
     if (intent === 'demo' && demoEnabled()) {
       session = await publicApi.post<Session>(`/auth/demo/${str(fd, 'role')}`);
     } else if (intent === 'verify') {
-      session = await publicApi.post<Session>('/auth/otp/verify', { phone: str(fd, 'phone'), code: str(fd, 'code') });
+      session = await publicApi.post<Session>('/auth/otp/verify', {
+        phone: str(fd, 'phone'),
+        code: str(fd, 'code'),
+      });
     } else {
       const mode = str(fd, 'mode') === 'otp' ? 'otp' : 'password';
-      const res = await publicApi.post<Session | { otpRequired: true }>('/auth/login', { mode, phone: str(fd, 'phone'), password: str(fd, 'password') });
-      if ('otpRequired' in res) return { step: 'otp' as const, phone: str(fd, 'phone'), error: null };
+      const res = await publicApi.post<Session | { otpRequired: true }>('/auth/login', {
+        mode,
+        phone: str(fd, 'phone'),
+        password: str(fd, 'password'),
+      });
+      if ('otpRequired' in res)
+        return { step: 'otp' as const, phone: str(fd, 'phone'), error: null };
       session = res;
     }
     if (!WEB_SPACE_OF[session.user.role]) {
-      return { step: 'login' as const, phone: '', error: `Le profil ${ROLE_LABELS[session.user.role].toLowerCase()} utilise l’application mobile.` };
+      return {
+        step: 'login' as const,
+        phone: '',
+        error: `Le profil ${ROLE_LABELS[session.user.role].toLowerCase()} utilise l’application mobile.`,
+      };
     }
     return await createUserSession(session.accessToken, session.refreshToken, session.user);
   } catch (e) {
     if (e instanceof Response) throw e;
-    if (e instanceof ApiError) return { step: intent === 'verify' ? ('otp' as const) : ('login' as const), phone: str(fd, 'phone'), error: e.message };
+    if (e instanceof ApiError)
+      return {
+        step: intent === 'verify' ? ('otp' as const) : ('login' as const),
+        phone: str(fd, 'phone'),
+        error: e.message,
+      };
     throw e;
   }
 }
@@ -56,20 +81,46 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
       <div className="hidden flex-col justify-between border-r border-divider bg-neutral-100 p-12 lg:flex">
-        <img src="/logo.png" alt="Gestion Élève Gabon" width={168} height={168} className="h-[168px] w-[168px]" />
+        <img
+          src="/logo.png"
+          alt="Gestion Élève Gabon"
+          width={168}
+          height={168}
+          className="h-[168px] w-[168px]"
+        />
         <div>
           <Kicker>Plateforme multiprofil · Gabon</Kicker>
-          <h1 className="mt-3 text-[64px] leading-[1.02] font-normal">Piloter l’école,<br /><span className="italic">sans papier.</span></h1>
-          <p className="mt-5 max-w-md text-[15px] leading-relaxed text-neutral-700">Établissements, agents, partenaires et équipe plateforme suivent l’engagement des élèves, les absences et les résultats au même endroit.</p>
+          <h1 className="mt-3 text-[64px] leading-[1.02] font-normal">
+            Piloter l’école,
+            <br />
+            <span className="italic">sans papier.</span>
+          </h1>
+          <p className="mt-5 max-w-md text-[15px] leading-relaxed text-neutral-700">
+            Établissements, agents, partenaires et équipe plateforme suivent l’engagement des
+            élèves, les absences et les résultats au même endroit.
+          </p>
         </div>
-        <p className="text-[12px] text-neutral-600">Les élèves, parents et enseignants utilisent l’application mobile.</p>
+        <p className="text-[12px] text-neutral-600">
+          Les élèves, parents et enseignants utilisent l’application mobile.
+        </p>
       </div>
 
       <main className="flex items-center justify-center px-6 py-12">
         <div className="flex w-full max-w-md flex-col gap-6">
+          <img
+            src="/logo.png"
+            alt="Gestion Élève Gabon"
+            className="mx-auto h-24 w-auto lg:hidden"
+          />
           <div>
-            <h2 className="text-[40px] leading-none font-normal">{otp ? 'Code de vérification' : 'Bonjour !'}</h2>
-            <p className="mt-2 text-[15px] text-neutral-700">{otp ? 'Saisissez le code reçu par SMS.' : 'Connectez-vous avec votre numéro de téléphone.'}</p>
+            <h2 className="text-[40px] leading-none font-normal">
+              {otp ? 'Code de vérification' : 'Bonjour !'}
+            </h2>
+            <p className="mt-2 text-[15px] text-neutral-700">
+              {otp
+                ? 'Saisissez le code reçu par SMS.'
+                : 'Connectez-vous avec votre numéro de téléphone.'}
+            </p>
           </div>
 
           {actionData?.error && <Notice tone="error">{actionData.error}</Notice>}
@@ -78,29 +129,73 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
             <Form method="post" className="flex flex-col gap-4">
               <input type="hidden" name="intent" value="verify" />
               <input type="hidden" name="phone" value={actionData.phone} />
-              <Field label="Code à 6 chiffres" hint="Pas de code ? Attendez une minute avant d’en redemander un.">
-                <Input name="code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} pattern="\d{6}" required className="tnum !min-h-13 text-center font-heading text-[28px] tracking-[.3em]" />
+              <Field
+                label="Code à 6 chiffres"
+                hint="Pas de code ? Attendez une minute avant d’en redemander un."
+              >
+                <Input
+                  name="code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  pattern="\d{6}"
+                  required
+                  className="tnum !min-h-13 text-center font-heading text-[28px] tracking-[.3em]"
+                />
               </Field>
-              <Button type="submit" disabled={busy} className="!min-h-13 text-[19px]">Valider</Button>
+              <Button type="submit" disabled={busy} className="!min-h-13 text-[19px]">
+                Valider
+              </Button>
             </Form>
           ) : (
             <Form method="post" className="flex flex-col gap-4">
               <Field label="Numéro de téléphone">
                 <div className="flex gap-2">
-                  <div className="tnum flex min-h-12 items-center rounded-md border border-divider px-3.5">+241</div>
-                  <Input name="phone" inputMode="tel" autoComplete="username" placeholder="07 00 00 00" required className="tnum !min-h-12 flex-1 text-[16px]" />
+                  <div className="tnum flex min-h-12 items-center rounded-md border border-divider px-3.5">
+                    +241
+                  </div>
+                  <Input
+                    name="phone"
+                    inputMode="tel"
+                    autoComplete="username"
+                    placeholder="07 00 00 00"
+                    required
+                    className="tnum !min-h-12 flex-1 text-[16px]"
+                  />
                 </div>
               </Field>
               <Chips name="mode-ui" options={MODES} value={mode} onChange={setMode} />
               <input type="hidden" name="mode" value={mode === MODES[1] ? 'otp' : 'password'} />
               {mode === MODES[0] ? (
                 <Field label="Mot de passe">
-                  <Input name="password" type="password" autoComplete="current-password" required className="!min-h-12" />
+                  <Input
+                    name="password"
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    className="!min-h-12"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setMode(MODES[1])}
+                    className="mt-1 w-fit text-[13px] text-accent-700 underline underline-offset-4 hover:text-accent-800"
+                  >
+                    Mot de passe oublié ou premier accès ? Recevoir un code par SMS
+                  </button>
                 </Field>
               ) : (
-                <p className="text-[14px] text-neutral-700">Nous vous envoyons un code à 6 chiffres par SMS. Pas besoin de mot de passe.</p>
+                <p className="text-[14px] text-neutral-700">
+                  Nous vous envoyons un code à 6 chiffres par SMS. Pas besoin de mot de passe.
+                </p>
               )}
-              <Button type="submit" disabled={busy} icon="arrow-right" className="!min-h-13 text-[19px]">{mode === MODES[0] ? 'Connexion' : 'Recevoir le code'}</Button>
+              <Button
+                type="submit"
+                disabled={busy}
+                icon="arrow-right"
+                className="!min-h-13 text-[19px]"
+              >
+                {mode === MODES[0] ? 'Connexion' : 'Recevoir le code'}
+              </Button>
             </Form>
           )}
 
@@ -110,9 +205,28 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
               <Form method="post" className="grid grid-cols-2 gap-2">
                 <input type="hidden" name="intent" value="demo" />
                 {WEB_DEMO_ROLES.map((r) => (
-                  <button key={r} name="role" value={r} type="submit" disabled={busy}
-                    className={cx('flex min-h-11 items-center justify-center gap-2 rounded-md border border-divider text-[13.5px] hover:bg-accent-100')}>
-                    <Icon name={r === 'etablissement' ? 'school' : r === 'agent' ? 'building-2' : r === 'partenaire' ? 'chart-no-axes-column' : 'user-cog'} size={15} />
+                  <button
+                    key={r}
+                    name="role"
+                    value={r}
+                    type="submit"
+                    disabled={busy}
+                    className={cx(
+                      'flex min-h-11 items-center justify-center gap-2 rounded-md border border-divider text-[13.5px] hover:bg-accent-100',
+                    )}
+                  >
+                    <Icon
+                      name={
+                        r === 'etablissement'
+                          ? 'school'
+                          : r === 'agent'
+                            ? 'building-2'
+                            : r === 'partenaire'
+                              ? 'chart-no-axes-column'
+                              : 'user-cog'
+                      }
+                      size={15}
+                    />
                     {ROLE_LABELS[r].replace(' institutionnel', '').replace(' plateforme', '')}
                   </button>
                 ))}

@@ -30,6 +30,19 @@ Les règles métier vivent dans `packages/shared` et sont partagées par les tro
 règles du mot de passe, validation du CSV d'élèves, seuil de confidentialité (10), matrice des droits,
 fonctionnalités par formule d'abonnement.
 
+## Organisation du code
+
+```
+apps/api/src/<domaine>/      contrôleur (routes) + service (règles) + accès (droits) — un domaine par dossier
+apps/web/app/routes/         une page = un fichier (chargeur, action, composition)
+apps/web/app/components/     ui/ et blocks/ (briques), puis un dossier par fonctionnalité (users/, import/, config/…)
+apps/mobile/src/features/    un dossier par fonctionnalité : XxxScreen.tsx, components/, use-xxx.ts, types.ts
+apps/mobile/src/app/         routes expo-router : ré-exportent les écrans, rien d'autre
+packages/shared/             règles métier et validation partagées (API, web, mobile)
+```
+
+Conventions détaillées (taille des fichiers, logique séparée de l'affichage, Prettier) : voir `CLAUDE.md`.
+
 ## Démarrer
 
 Node ≥ 22.

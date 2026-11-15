@@ -1,1 +1,1 @@
-export { Alertes as default } from '@/screens/parent';
+export { AlertsScreen as default } from '@/features/parent';

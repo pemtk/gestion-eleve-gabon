@@ -1,4 +1,11 @@
-import { isRouteErrorResponse, Links, Meta, Outlet, Scripts, ScrollRestoration } from 'react-router';
+import {
+  isRouteErrorResponse,
+  Links,
+  Meta,
+  Outlet,
+  Scripts,
+  ScrollRestoration,
+} from 'react-router';
 import type { Route } from './+types/root';
 import { renewSession } from '~/lib/renew.server';
 import './app.css';
@@ -42,14 +49,22 @@ export default function App() {
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   const notFound = isRouteErrorResponse(error) && error.status === 404;
   const message = isRouteErrorResponse(error)
-    ? (typeof error.data === 'string' ? error.data : error.statusText)
-    : error instanceof Error ? error.message : 'Une erreur est survenue.';
+    ? typeof error.data === 'string'
+      ? error.data
+      : error.statusText
+    : error instanceof Error
+      ? error.message
+      : 'Une erreur est survenue.';
   return (
     <main className="mx-auto max-w-xl px-6 py-24">
-      <p className="text-[11px] tracking-[.1em] uppercase text-accent-700">{notFound ? '404' : 'Erreur'}</p>
+      <p className="text-[11px] tracking-[.1em] uppercase text-accent-700">
+        {notFound ? '404' : 'Erreur'}
+      </p>
       <h1 className="mt-1 text-4xl">{notFound ? 'Page introuvable' : 'Un instant…'}</h1>
       <p className="mt-3 text-neutral-700">{notFound ? 'Cette page n’existe pas.' : message}</p>
-      <a href="/" className="mt-6 inline-block">Retour à l’accueil</a>
+      <a href="/" className="mt-6 inline-block">
+        Retour à l’accueil
+      </a>
     </main>
   );
 }

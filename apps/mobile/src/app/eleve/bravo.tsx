@@ -1,1 +1,1 @@
-export { Bravo as default } from '@/screens/eleve';
+export { CelebrationScreen as default } from '@/features/student';
