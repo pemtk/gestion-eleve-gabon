@@ -23,7 +23,8 @@ export function EvaluationStep({ initialGravity = '', onSubmit }: Props) {
   return (
     <Section title="Première évaluation">
       <div className="flex flex-col gap-4">
-        <Field label="Gravité">
+        <fieldset className="flex flex-col gap-1.5">
+          <legend className="mb-1.5 text-[12.5px] text-neutral-700">Gravité</legend>
           <div className="grid gap-2 sm:grid-cols-3">
             {GRAVITIES.map(([level, hint]) => (
               <button
@@ -43,7 +44,7 @@ export function EvaluationStep({ initialGravity = '', onSubmit }: Props) {
               </button>
             ))}
           </div>
-        </Field>
+        </fieldset>
         <Field label="Mesures envisagées">
           <Textarea
             rows={3}
