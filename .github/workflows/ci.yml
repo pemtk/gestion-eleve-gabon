@@ -13,6 +13,17 @@ permissions:
   contents: read
 
 jobs:
+  format:
+    name: Mise en forme (Prettier)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version-file: .nvmrc, cache: npm }
+      - run: npm ci
+      - name: Le code est mis en forme (npm run format pour corriger)
+        run: npm run format:check
+
   backend:
     name: Paquets partagés + API (NestJS + PostgreSQL)
     runs-on: ubuntu-latest
