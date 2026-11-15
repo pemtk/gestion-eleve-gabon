@@ -19,7 +19,8 @@ import {
   visitReports,
 } from '../db/schema.js';
 import { FilesService, toStored } from '../files/files.service.js';
-import { alertsOf, DashboardService } from '../dashboard/dashboard.service.js';
+import { alertsOf } from '../dashboard/alerts.js';
+import { DashboardService } from '../dashboard/dashboard.service.js';
 import { IndicatorsService } from '../indicators/indicators.service.js';
 
 /** Un agent ne voit que les établissements de son périmètre (table `user_scopes`). */
@@ -137,7 +138,7 @@ export class AgentController {
       7,
     );
     return stats.flatMap((s) =>
-      alertsOf(s).map((a) => ({
+      alertsOf(s, 'agent').map((a) => ({
         icon: a.icon,
         text: `${s.name} · ${a.title} : ${a.text}`,
       })),

@@ -107,6 +107,11 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
 
       <main className="flex items-center justify-center px-6 py-12">
         <div className="flex w-full max-w-md flex-col gap-6">
+          <img
+            src="/logo.png"
+            alt="Gestion Élève Gabon"
+            className="mx-auto h-24 w-auto lg:hidden"
+          />
           <div>
             <h2 className="text-[40px] leading-none font-normal">
               {otp ? 'Code de vérification' : 'Bonjour !'}
@@ -170,6 +175,13 @@ export default function Login({ loaderData, actionData }: Route.ComponentProps) 
                     required
                     className="!min-h-12"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setMode(MODES[1])}
+                    className="mt-1 w-fit text-[13px] text-accent-700 underline underline-offset-4 hover:text-accent-800"
+                  >
+                    Mot de passe oublié ou premier accès ? Recevoir un code par SMS
+                  </button>
                 </Field>
               ) : (
                 <p className="text-[14px] text-neutral-700">

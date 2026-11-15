@@ -45,7 +45,15 @@
     opacity: 0.45;
     cursor: not-allowed;
   }
+  /* Cormorant Garamond a des chiffres « elzéviriens » (le 1 ressemble à un I) : on garde les chiffres alignés sur la ligne. */
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-heading {
+    font-variant-numeric: lining-nums;
+  }
   .tnum {
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: lining-nums tabular-nums;
   }
 }

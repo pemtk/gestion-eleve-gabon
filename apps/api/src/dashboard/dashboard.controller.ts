@@ -5,19 +5,12 @@ import {
   Inject,
   Param,
 } from '@nestjs/common';
-import {
-  DASHBOARDS,
-  ROLE_OF_SPACE,
-  WEB_NAV,
-  planHas,
-  type WebSpace,
-} from '@sge/shared';
+import { DASHBOARDS, ROLE_OF_SPACE, planHas, type WebSpace } from '@sge/shared';
 import { CurrentUser, schoolOf, type AuthUser } from '../common/auth.js';
 import { DB, type Db } from '../db/db.module.js';
 import { getSubscription, schoolName } from '../db/subscription.js';
-import { ConversationsService } from '../messaging/conversations.service.js';
 import { PartnerService } from '../partner/partner.service.js';
-import { DashboardService, withBadges } from './dashboard.service.js';
+import { DashboardService } from './dashboard.service.js';
 
 /**
  * Les indicateurs sont calculés à partir des données réelles (comptes activés, tâches terminées, appels, notes, signalements) :
@@ -29,7 +22,6 @@ export class DashboardController {
     @Inject(DB) private readonly db: Db,
     private readonly dashboards: DashboardService,
     private readonly partner: PartnerService,
-    private readonly conversations: ConversationsService,
   ) {}
 
   /** Un profil ne voit que son propre espace ; les tableaux avancés dépendent de la formule (écoles). */
@@ -43,12 +35,10 @@ export class DashboardController {
         'Cet espace n’est pas accessible avec votre profil.',
       );
     const data = DASHBOARDS[space];
-    const nav = WEB_NAV[space];
     if (space === 'ecole') {
       const sid = schoolOf(user);
       const { plan, suspended } = await getSubscription(this.db, sid);
-      const { body, badges } = await this.dashboards.school(sid);
-      badges['/ecole/messages'] = await this.conversations.unreadTotal(user);
+      const { body } = await this.dashboards.school(sid);
       // L'en-tête porte le nom de l'établissement connecté (pas celui du jeu de démonstration).
       const head = {
         ...data.head,
@@ -58,19 +48,17 @@ export class DashboardController {
         ...data,
         ...body,
         head,
-        nav: withBadges(nav, badges),
         plan,
         suspended,
         statsLocked: !planHas(plan).stats,
       };
     }
     if (space === 'agent') {
-      const { body, kicker, badges } = await this.dashboards.agent(user.sub);
+      const { body, kicker } = await this.dashboards.agent(user.sub);
       return {
         ...data,
         ...body,
         head: { ...data.head, kicker },
-        nav: withBadges(nav, badges),
         statsLocked: false,
       };
     }
@@ -90,15 +78,13 @@ export class DashboardController {
         ...data,
         ...national,
         table,
-        nav: withBadges(nav, {}),
         statsLocked: false,
       };
     }
-    const { body, badges } = await this.dashboards.admin();
+    const { body } = await this.dashboards.admin();
     return {
       ...data,
       ...body,
-      nav: withBadges(nav, badges),
       statsLocked: false,
     };
   }
@@ -119,7 +105,6 @@ export class DashboardController {
       ...DASHBOARDS.ecole,
       ...body,
       head: { ...DASHBOARDS.ecole.head, kicker },
-      nav: WEB_NAV.ecole,
     };
   }
 }

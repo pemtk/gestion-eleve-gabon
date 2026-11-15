@@ -714,22 +714,22 @@ export const SUPPORT = { email: 'support@gestioneleves.ga', priorityLine: '+241 
 export const WEB_NAV: Record<WebSpace, NavItem[]> = {
   ecole: [
     { icon: 'layout-dashboard', label: 'Tableau de bord', to: '/ecole' },
-    { icon: 'users', label: 'Utilisateurs', badge: '3', to: '/ecole/utilisateurs' },
+    { icon: 'users', label: 'Utilisateurs', to: '/ecole/utilisateurs' },
     { icon: 'school', label: 'Classes', to: '/ecole/configuration?tab=classes' },
-    { icon: 'calendar-check', label: 'Absences', badge: '12', to: '/ecole/absences' },
+    { icon: 'calendar-check', label: 'Absences', to: '/ecole/absences' },
     { icon: 'award', label: 'Résultats', to: '/ecole/resultats' },
     { icon: 'megaphone', label: 'Annonces', to: '/ecole/annonces' },
     { icon: 'message-circle', label: 'Messages', to: '/ecole/messages' },
-    { icon: 'shield', label: 'Vie scolaire', badge: '1', to: '/ecole/vie-scolaire' },
+    { icon: 'shield', label: 'Vie scolaire', to: '/ecole/vie-scolaire' },
     { icon: 'settings', label: 'Configuration', to: '/ecole/configuration' },
     { icon: 'network', label: 'Vue réseau', to: '/ecole/reseau' },
     { icon: 'credit-card', label: 'Mon abonnement', to: '/ecole/abonnement' },
   ],
   agent: [
-    { icon: 'building-2', label: 'Mes écoles', badge: '8', to: '/agent' },
+    { icon: 'building-2', label: 'Mes écoles', to: '/agent' },
     { icon: 'file-text', label: 'Comptes-rendus', to: '/agent/comptes-rendus' },
     { icon: 'school', label: 'Fiche école', to: '/agent/ecole' },
-    { icon: 'bell', label: 'Alertes', badge: '4', to: '/agent/alertes' },
+    { icon: 'bell', label: 'Alertes', to: '/agent/alertes' },
   ],
   partenaire: [
     { icon: 'chart-no-axes-column', label: 'Indicateurs', to: '/partenaire' },
@@ -740,9 +740,9 @@ export const WEB_NAV: Record<WebSpace, NavItem[]> = {
   admin: [
     { icon: 'layout-dashboard', label: 'Vue globale', to: '/admin' },
     { icon: 'building-2', label: 'Organisations', to: '/admin/organisations' },
-    { icon: 'credit-card', label: 'Abonnements', badge: '5', to: '/admin/abonnements' },
+    { icon: 'credit-card', label: 'Abonnements', to: '/admin/abonnements' },
     { icon: 'user-cog', label: 'Agents & partenaires', to: '/admin/utilisateurs' },
-    { icon: 'activity', label: 'Incidents', badge: '2', to: '/admin/incidents' },
+    { icon: 'activity', label: 'Incidents', to: '/admin/incidents' },
   ],
 };
 

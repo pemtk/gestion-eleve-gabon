@@ -86,7 +86,9 @@ export interface SideItem {
   icon: string;
   title: string;
   text: string;
-  cta: string;
+  /** Libellé et destination de l'action : sans destination, aucune action n'est affichée (jamais de faux lien). */
+  cta?: string;
+  to?: string;
   highlight?: boolean;
 }
 export interface DashboardData {

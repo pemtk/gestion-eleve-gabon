@@ -90,11 +90,8 @@ export default function Messages({ loaderData: d, actionData }: Route.ComponentP
                   {t.initials || <Icon name={t.icon ?? 'users'} size={18} />}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="flex justify-between gap-2">
-                    <span className={cx('truncate', t.unread > 0 && 'font-semibold')}>
-                      {t.name}
-                    </span>
-                    <span className="flex-none text-[12px] text-neutral-600">{t.time}</span>
+                  <span className={cx('block truncate', t.unread > 0 && 'font-semibold')}>
+                    {t.name}
                   </span>
                   <span className="block text-[12px] text-neutral-600">{t.kind}</span>
                   <span
@@ -106,14 +103,17 @@ export default function Messages({ loaderData: d, actionData }: Route.ComponentP
                     {t.last}
                   </span>
                 </span>
-                {t.unread > 0 && (
-                  <span
-                    aria-label={`${t.unread} non lu${t.unread > 1 ? 's' : ''}`}
-                    className="inline-flex h-5.5 min-w-5.5 flex-none items-center justify-center rounded-full bg-accent-200 px-1.5 text-[12px] font-semibold text-accent-800"
-                  >
-                    {t.unread}
-                  </span>
-                )}
+                <span className="flex flex-none flex-col items-end gap-1.5 self-start pt-0.5">
+                  <span className="text-[12px] text-neutral-600">{t.time}</span>
+                  {t.unread > 0 && (
+                    <span
+                      aria-label={`${t.unread} non lu${t.unread > 1 ? 's' : ''}`}
+                      className="inline-flex h-5.5 min-w-5.5 items-center justify-center rounded-full bg-accent-200 px-1.5 text-[12px] font-semibold text-accent-800"
+                    >
+                      {t.unread}
+                    </span>
+                  )}
+                </span>
               </Link>
             ))}
             {!d.threads.length && (
@@ -125,9 +125,15 @@ export default function Messages({ loaderData: d, actionData }: Route.ComponentP
         </div>
         <Section title={d.selected ? `${d.selected.name} · ${d.selected.kind}` : 'Conversation'}>
           {!d.selected && (
-            <p className="text-[14px] text-neutral-700">
-              Choisissez une conversation, ou écrivez à un parent ou à un enseignant.
-            </p>
+            <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-center">
+              <span className="grid h-14 w-14 place-items-center rounded-full border-[1.5px] border-accent-400 text-accent-700">
+                <Icon name="message-circle" size={26} />
+              </span>
+              <p className="max-w-xs text-[14px] text-neutral-700">
+                Choisissez une conversation à gauche, ou écrivez à un parent ou à un enseignant avec
+                « Nouvelle conversation ».
+              </p>
+            </div>
           )}
           {d.selected && (
             <div className="flex flex-col gap-3">

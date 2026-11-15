@@ -32,6 +32,8 @@ import { StudentController } from './learning/student.controller.js';
 import { TeacherController } from './learning/teacher.controller.js';
 import { ConversationsController } from './messaging/conversations.controller.js';
 import { ConversationsService } from './messaging/conversations.service.js';
+import { NavController } from './nav/nav.controller.js';
+import { NavService } from './nav/nav.service.js';
 import { MessagingController } from './messaging/messaging.controller.js';
 import { PartnerController } from './partner/partner.controller.js';
 import { PartnerService } from './partner/partner.service.js';
@@ -74,6 +76,7 @@ export function jwtSecret(): string {
     AccountController,
     MessagingController,
     ConversationsController,
+    NavController,
     AgentController,
     PartnerController,
     AdminController,
@@ -91,6 +94,7 @@ export function jwtSecret(): string {
     AuditService,
     FilesService,
     ConversationsService,
+    NavService,
     CasesService,
     SchoolPolicy,
     PartnerService,

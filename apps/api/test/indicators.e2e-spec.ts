@@ -18,7 +18,6 @@ interface Dash {
   chart: { rows: { label: string; pct: number; display?: string }[] };
   side: { items: { title: string }[] };
   table: { rows: string[][] };
-  nav: { label: string; badge?: string }[];
 }
 
 /** Ticket #24 — les indicateurs viennent des données : ils changent avec elles et respectent le cloisonnement et le seuil de 10. */
@@ -31,8 +30,14 @@ describe('Indicateurs calculés (PostgreSQL)', () => {
     (await get(`/dashboard/${space}`, t).expect(200)).body as Dash;
   const kpi = (d: Dash, label: string) =>
     d.kpis.find((k) => k.label === label)!;
-  const badge = (d: Dash, label: string) =>
-    d.nav.find((n) => n.label === label)?.badge;
+  /** Menu et pastilles de l'espace (GET /nav). */
+  const menu = async (t: string) =>
+    (await get('/nav', t).expect(200)).body as {
+      label: string;
+      badge?: string;
+    }[];
+  const badge = async (t: string, label: string) =>
+    (await menu(t)).find((n) => n.label === label)?.badge;
   const activate = async (phone: string) => {
     await c.api().post('/auth/otp/request').send({ phone }).expect(201);
     return (
@@ -183,9 +188,8 @@ describe('Indicateurs calculés (PostgreSQL)', () => {
       expect(row(await dash('ecole', ecole), '3ème B')[4]).toBe('À jour');
     });
 
-    it('les pastilles de navigation comptent les vraies absences et signalements', async () => {
-      const before = await dash('ecole', ecole);
-      const absences = Number(badge(before, 'Absences') ?? 0);
+    it('les pastilles de navigation comptent les vraies absences, signalements et messages', async () => {
+      const absences = Number((await badge(ecole, 'Absences')) ?? 0);
       await c
         .api()
         .post('/me/teacher/attendance')
@@ -196,16 +200,42 @@ describe('Indicateurs calculés (PostgreSQL)', () => {
           entries: [{ studentId: 's9', status: 'A' }],
         })
         .expect(201);
-      expect(Number(badge(await dash('ecole', ecole), 'Absences'))).toBe(
-        absences + 1,
-      );
-      expect(badge(before, 'Vie scolaire')).toBe('3'); // 3 signalements confidentiels à accuser
+      expect(Number(await badge(ecole, 'Absences'))).toBe(absences + 1);
+      expect(await badge(ecole, 'Vie scolaire')).toBe('3'); // 3 signalements confidentiels ouverts
+      expect(await badge(ecole, 'Utilisateurs')).toBe('3'); // 3 demandes de rattachement
+      // un message du parent à l'administration arrive chez la direction
+      const before = Number((await badge(ecole, 'Messages')) ?? 0);
+      const parent = await c.token('parent');
+      const admin = (
+        (await get('/threads', parent).expect(200)).body as {
+          id: string;
+          name: string;
+        }[]
+      ).find((t) => t.name === 'Administration')!;
       await c
         .api()
-        .post('/school/cases/SC-0142/acknowledge')
-        .set(c.as(ecole))
+        .post(`/threads/${admin.id}/messages`)
+        .set(c.as(parent))
+        .send({ text: 'Bonjour', clientId: 'nav-1' })
         .expect(201);
-      expect(badge(await dash('ecole', ecole), 'Vie scolaire')).toBe('2');
+      expect(Number(await badge(ecole, 'Messages'))).toBe(before + 1);
+    });
+
+    it('le menu ne contient aucune valeur figée : seuls les compteurs réels apparaissent', async () => {
+      const labels = (await menu(ecole)).map((n) => n.label);
+      expect(labels).toEqual(
+        expect.arrayContaining([
+          'Tableau de bord',
+          'Utilisateurs',
+          'Messages',
+          'Vie scolaire',
+        ]),
+      );
+      const partner = await menu(await c.token('partenaire'));
+      expect(partner.length).toBeGreaterThan(0);
+      expect(partner.every((n) => !n.badge)).toBe(true);
+      await get('/nav', await c.token('eleve')).expect(403); // pas d'espace web pour l'élève
+      await c.api().get('/nav').expect(401);
     });
 
     it('la liste des classes donne la complétion mesurée, pas la valeur figée de la démonstration', async () => {
@@ -260,7 +290,7 @@ describe('Indicateurs calculés (PostgreSQL)', () => {
       expect(d.table.rows).toEqual([]);
       expect(d.chart.rows).toEqual([]);
       expect(d.side.items.map((i) => i.title)).toEqual(['Rien à signaler']);
-      expect(d.nav.filter((n) => n.badge)).toEqual([]);
+      expect((await menu(neuf)).filter((n) => n.badge)).toEqual([]);
       expect(d.head.kicker).toContain('Collège Neuf');
     });
 
@@ -337,6 +367,62 @@ describe('Indicateurs calculés (PostgreSQL)', () => {
     });
   });
 
+  describe('points d’attention', () => {
+    it('chaque action affichée mène quelque part (jamais de faux lien)', async () => {
+      const items = (await dash('ecole', ecole)).side.items as {
+        cta?: string;
+        to?: string;
+      }[];
+      expect(items.length).toBeGreaterThan(0);
+      for (const item of items) {
+        expect(item.to).toMatch(/^\/ecole/);
+        expect(item.cta).toBeTruthy();
+      }
+      const partner = (await dash('partenaire', await c.token('partenaire')))
+        .side.items as { to?: string }[];
+      expect(partner.every((i) => !i.to)).toBe(true); // texte d'information : pas d'action
+    });
+
+    it('l’agent et le réseau ne voient pas les signalements confidentiels ni les rattachements d’une école', async () => {
+      const own = JSON.stringify((await dash('ecole', ecole)).side.items);
+      expect(own).toMatch(/confidentiel/); // la direction, oui
+      expect(own).toMatch(/rattachement/);
+      const agent = await c.token('agent');
+      const seenByAgent = JSON.stringify([
+        (await get('/agent/alerts', agent).expect(200)).body,
+        (
+          await get(
+            '/agent/schools/Lyc%C3%A9e%20L%C3%A9on%20Mba',
+            agent,
+          ).expect(200)
+        ).body.alerts,
+      ]);
+      expect(seenByAgent).not.toMatch(/confidentiel|rattachement|signalement/i);
+      const admin = await c.token('admin');
+      await c
+        .api()
+        .put(`/admin/subscriptions/${DEMO_SCHOOL_ID}`)
+        .set(c.as(admin))
+        .send({
+          plan: 'Réseau',
+          period: 'annuelle',
+          start: '2026-01-01',
+          end: '2027-12-31',
+          active: true,
+        })
+        .expect(200);
+      const network = JSON.stringify(
+        (await dash('ecole/network', ecole)).side.items,
+      );
+      expect(network).not.toMatch(/confidentiel|rattachement|signalement/i);
+      expect(
+        (
+          (await dash('ecole/network', ecole)).side.items as { to?: string }[]
+        ).every((i) => i.to === '/ecole/reseau'),
+      ).toBe(true);
+    });
+  });
+
   describe('espace agent', () => {
     it('ne contient que les écoles du périmètre, avec les mêmes chiffres partout', async () => {
       const agent = await c.token('agent');
@@ -363,6 +449,14 @@ describe('Indicateurs calculés (PostgreSQL)', () => {
       expect(kpi(d, 'Absences signalées').value).toBe(
         String(list.reduce((n, r) => n + Number(r.absences), 0)),
       );
+    });
+
+    it('la barre latérale de l’agent compte ses écoles et ses alertes (pas les valeurs de la maquette)', async () => {
+      const agent = await c.token('agent');
+      expect(await badge(agent, 'Mes écoles')).toBe('6'); // périmètre de démonstration, et non « 8 »
+      const alerts = (await get('/agent/alerts', agent).expect(200))
+        .body as unknown[];
+      expect(Number((await badge(agent, 'Alertes')) ?? 0)).toBe(alerts.length);
     });
 
     it('ajouter une école au périmètre l’ajoute aux chiffres ; une école hors périmètre reste introuvable', async () => {
@@ -581,7 +675,8 @@ describe('Indicateurs calculés (PostgreSQL)', () => {
 
     it('les incidents ouverts et les demandes de formule alimentent les pastilles', async () => {
       const admin = await c.token('admin');
-      expect(badge(await dash('admin', admin), 'Incidents')).toBe('2');
+      expect(await badge(admin, 'Incidents')).toBe('2');
+      expect(await badge(admin, 'Abonnements')).toBeUndefined(); // aucune demande de formule en attente
       const incidents = (await get('/admin/incidents', admin).expect(200))
         .body as { id: string }[];
       await c
@@ -589,7 +684,7 @@ describe('Indicateurs calculés (PostgreSQL)', () => {
         .post(`/admin/incidents/${incidents[0]!.id}/resolve`)
         .set(c.as(admin))
         .expect(201);
-      expect(badge(await dash('admin', admin), 'Incidents')).toBe('1');
+      expect(await badge(admin, 'Incidents')).toBe('1');
     });
 
     it('permet de situer une école existante', async () => {
