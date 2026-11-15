@@ -6,6 +6,20 @@ export default [
   route('logout', 'routes/logout.tsx'),
   route('fichiers/:id', 'routes/fichier.ts'),
 
+  // Enseignant
+  ...prefix('enseignant', [
+    layout('routes/enseignant/layout.tsx', [
+      index('routes/enseignant/dashboard.tsx'),
+      route('classes', 'routes/enseignant/classes.tsx'),
+      route('taches', 'routes/enseignant/tasks.tsx'),
+      route('taches/nouvelle', 'routes/enseignant/task-new.tsx'),
+      route('taches/:taskId', 'routes/enseignant/task-follow-up.tsx'),
+      route('notes', 'routes/enseignant/grades.tsx'),
+      route('appel', 'routes/enseignant/attendance.tsx'),
+      route('annonces', 'routes/enseignant/announcements.tsx'),
+    ]),
+  ]),
+
   // Établissement (administrateur d'école)
   ...prefix('ecole', [
     layout('routes/ecole/layout.tsx', [

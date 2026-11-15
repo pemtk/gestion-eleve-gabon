@@ -10,3 +10,4 @@ export * from './Tabs';
 export * from './Notice';
 export * from './Dialog';
 export * from './Avatar';
+export * from './ProgressBar';

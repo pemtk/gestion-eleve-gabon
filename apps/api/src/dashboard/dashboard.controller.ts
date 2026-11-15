@@ -36,7 +36,11 @@ export class DashboardController {
     @CurrentUser() user: AuthUser,
     @Param('space') space: WebSpace,
   ) {
-    if (!(space in DASHBOARDS) || ROLE_OF_SPACE[space] !== user.role)
+    if (
+      space === 'enseignant' ||
+      !(space in DASHBOARDS) ||
+      ROLE_OF_SPACE[space] !== user.role
+    )
       throw new ForbiddenException(
         'Cet espace n’est pas accessible avec votre profil.',
       );

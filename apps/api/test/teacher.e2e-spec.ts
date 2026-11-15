@@ -75,6 +75,22 @@ describe('Espace enseignant (PostgreSQL)', () => {
     await get('/me/teacher/classes/b6a/students', prof).expect(404); // classe d'une autre école
   });
 
+  it('l’enseignant a son menu web (tâches, notes, appel…) et les autres profils ne le voient pas', async () => {
+    const nav = (await get('/nav', prof).expect(200)).body as { to: string }[];
+    expect(nav.map((n) => n.to)).toEqual([
+      '/enseignant',
+      '/enseignant/classes',
+      '/enseignant/taches',
+      '/enseignant/notes',
+      '/enseignant/appel',
+      '/enseignant/annonces',
+    ]);
+    const school = (await get('/nav', direction).expect(200)).body as {
+      to: string;
+    }[];
+    expect(school.every((n) => n.to.startsWith('/ecole'))).toBe(true);
+  });
+
   describe('tâches par classe et par élève (#16)', () => {
     it('une tâche n’est visible que des élèves de sa classe', async () => {
       const aicha = await c.token('eleve'); // 3ème B

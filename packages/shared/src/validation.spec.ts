@@ -9,7 +9,10 @@ import {
   signupSchema,
   taskInputSchema,
   loginSchema,
+  ROLE_OF_SPACE,
+  WEB_NAV,
   WEB_ROLES,
+  WEB_SPACE_OF,
   MOBILE_ROLES,
   formatCode,
 } from './index.js';
@@ -86,6 +89,13 @@ describe('droits', () => {
   it('répartit les profils sur les supports', () => {
     expect(MOBILE_ROLES).toEqual(['eleve', 'parent', 'enseignant']);
     expect(WEB_ROLES).toEqual(['enseignant', 'etablissement', 'agent', 'partenaire', 'admin']);
+  });
+  it('associe chaque espace web à un seul profil, et inversement', () => {
+    for (const role of WEB_ROLES) {
+      const space = WEB_SPACE_OF[role]!;
+      expect(ROLE_OF_SPACE[space]).toBe(role);
+      expect(WEB_NAV[space].length).toBeGreaterThan(0);
+    }
   });
   it('formate le code parent', () => expect(formatCode('482917')).toBe('482 917'));
 });

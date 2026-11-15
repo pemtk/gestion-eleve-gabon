@@ -37,14 +37,16 @@ export const MOBILE_ROLES: Role[] = ROLES.filter((r) => ROLE_SUPPORTS[r].include
 export const WEB_ROLES: Role[] = ROLES.filter((r) => ROLE_SUPPORTS[r].includes('web'));
 
 /** Espaces web (un par profil institutionnel). */
-export type WebSpace = 'ecole' | 'agent' | 'partenaire' | 'admin';
+export type WebSpace = 'enseignant' | 'ecole' | 'agent' | 'partenaire' | 'admin';
 export const WEB_SPACE_OF: Partial<Record<Role, WebSpace>> = {
+  enseignant: 'enseignant',
   etablissement: 'ecole',
   agent: 'agent',
   partenaire: 'partenaire',
   admin: 'admin',
 };
 export const ROLE_OF_SPACE: Record<WebSpace, Role> = {
+  enseignant: 'enseignant',
   ecole: 'etablissement',
   agent: 'agent',
   partenaire: 'partenaire',
@@ -147,6 +149,7 @@ export function can(role: Role, capability: Capability): boolean {
 
 /** Page d'accueil de chaque profil dans l'application web. */
 export const WEB_HOME: Record<WebSpace, string> = {
+  enseignant: '/enseignant',
   ecole: '/ecole',
   agent: '/agent',
   partenaire: '/partenaire',
