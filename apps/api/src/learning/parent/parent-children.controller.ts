@@ -8,71 +8,46 @@ import {
   NotFoundException,
   Param,
   Post,
-  Put,
 } from '@nestjs/common';
 import { and, desc, eq, gte, inArray, isNull } from 'drizzle-orm';
-import {
-  ALERT_PREFS,
-  PARENT_ALERTS,
-  linkChildSchema,
-  rewardSchema,
-} from '@sge/shared';
+import { linkChildSchema } from '@sge/shared';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { CurrentUser, Roles, type AuthUser } from '../common/auth.js';
-import { DB, type Db } from '../db/db.module.js';
+import { CurrentUser, Roles, type AuthUser } from '../../common/auth.js';
+import { DB, type Db } from '../../db/db.module.js';
 import {
-  alertPrefs,
   attendanceRecords,
   classes,
   linkRequests,
-  organizations,
   rewards,
   studentParents,
   students,
   taskCompletions,
   tasks,
   workSessions,
-} from '../db/schema.js';
-import { getLearner } from './learner.js';
-import { dateLabel, recentGrades, subjectResults } from './results.js';
+} from '../../db/schema.js';
+import { getLearner } from '../learner.js';
+import { dateLabel, recentGrades, subjectResults } from '../results.js';
+import { ParentChildrenService } from './parent-children.service.js';
 
-const prefsSchema = z.array(z.object({ id: z.string(), on: z.boolean() }));
 const DAY_LABELS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+
 const hoursLabel = (minutes: number) =>
   `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')}`;
 
+/** Enfants du parent : liste, fiche détaillée et rattachement par code d'invitation (§5.2). */
 @Roles('parent')
 @Controller('me/parent')
-export class ParentController {
-  constructor(@Inject(DB) private readonly db: Db) {}
-
-  /** Enfants rattachés à CE parent (ses liens `student_parents`), quelle que soit leur école. */
-  private async kids(userId: string) {
-    return this.db
-      .select({
-        s: students,
-        className: classes.name,
-        school: organizations.name,
-      })
-      .from(studentParents)
-      .innerJoin(students, eq(students.id, studentParents.studentId))
-      .innerJoin(classes, eq(classes.id, students.classId))
-      .innerJoin(organizations, eq(organizations.id, students.schoolId))
-      .where(eq(studentParents.parentUserId, userId))
-      .orderBy(studentParents.id);
-  }
-
-  private async kid(userId: string, id: string) {
-    const row = (await this.kids(userId)).find((k) => k.s.id === id);
-    if (!row) throw new NotFoundException('Enfant introuvable.');
-    return row;
-  }
+export class ParentChildrenController {
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly family: ParentChildrenService,
+  ) {}
 
   /** Accueil : une phrase d'état par enfant (« Tout va bien… » ou l'absence non justifiée). */
   @Get('children')
   async children(@CurrentUser() user: AuthUser) {
-    const rows = await this.kids(user.sub);
+    const rows = await this.family.kids(user.sub);
     const ids = rows.map((r) => r.s.id);
     const unjustified = ids.length
       ? await this.db
@@ -113,7 +88,7 @@ export class ParentController {
 
   @Get('children/:id')
   async child(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    const { s, className, school } = await this.kid(user.sub, id);
+    const { s, className, school } = await this.family.kid(user.sub, id);
     const l = s.userId
       ? await getLearner(this.db, s.userId)
       : { points: 0, streak: 0, doneToday: 0 };
@@ -199,43 +174,6 @@ export class ParentController {
     };
   }
 
-  /** Préférences d'alerte du parent ; créées avec les valeurs par défaut à la première lecture. */
-  private async prefs(userId: string) {
-    await this.db
-      .insert(alertPrefs)
-      .values(ALERT_PREFS.map((a) => ({ ...a, userId })))
-      .onConflictDoNothing();
-    return this.db
-      .select()
-      .from(alertPrefs)
-      .where(eq(alertPrefs.userId, userId))
-      .orderBy(alertPrefs.id);
-  }
-
-  @Get('alerts')
-  async alerts(@CurrentUser() user: AuthUser) {
-    return {
-      alerts: PARENT_ALERTS,
-      prefs: (await this.prefs(user.sub)).map(({ userId: _u, ...p }) => p),
-    };
-  }
-
-  @Put('alert-prefs')
-  async setPrefs(
-    @CurrentUser() user: AuthUser,
-    @Body({ schema: prefsSchema }) body: z.infer<typeof prefsSchema>,
-  ) {
-    await this.prefs(user.sub);
-    await this.db.transaction(async (tx) => {
-      for (const p of body)
-        await tx
-          .update(alertPrefs)
-          .set({ on: p.on })
-          .where(and(eq(alertPrefs.userId, user.sub), eq(alertPrefs.id, p.id)));
-    });
-    return (await this.prefs(user.sub)).map(({ userId: _u, ...p }) => p);
-  }
-
   /**
    * §5.1 — rattachement par code à 6 chiffres ou QR code. Un code valide rattache tout de suite ;
    * un code déjà utilisé deux fois attend la validation de l'école (jamais de rattachement automatique).
@@ -293,59 +231,5 @@ export class ParentController {
       child: { name: child, className: row.className },
       note: 'Le rattachement est actif.',
     };
-  }
-
-  /** Récompenses du parent ; les points sont ceux de l'enfant choisi (`?child=`), par défaut le premier. */
-  @Get('rewards')
-  async rewards(@CurrentUser() user: AuthUser) {
-    return this.rewardsFor(user, undefined);
-  }
-
-  @Get('rewards/:childId')
-  async rewardsOf(
-    @CurrentUser() user: AuthUser,
-    @Param('childId') childId: string,
-  ) {
-    return this.rewardsFor(user, childId);
-  }
-
-  private async rewardsFor(user: AuthUser, childId?: string) {
-    const kids = await this.kids(user.sub);
-    const kid = childId ? kids.find((k) => k.s.id === childId) : kids[0];
-    if (childId && !kid) throw new NotFoundException('Enfant introuvable.');
-    const points = kid?.s.userId
-      ? (await getLearner(this.db, kid.s.userId)).points
-      : 0;
-    const rows = await this.db
-      .select()
-      .from(rewards)
-      .where(eq(rewards.ownerId, user.sub))
-      .orderBy(rewards.id);
-    return {
-      child: kid ? kid.s.firstName : null,
-      points,
-      rewards: rows.map((r) => ({
-        ...r,
-        reached: points >= r.threshold,
-        left: Math.max(0, r.threshold - points),
-      })),
-    };
-  }
-
-  @Post('rewards')
-  async addReward(
-    @CurrentUser() user: AuthUser,
-    @Body({ schema: rewardSchema }) body: z.infer<typeof rewardSchema>,
-  ) {
-    const [reward] = await this.db
-      .insert(rewards)
-      .values({
-        id: randomUUID(),
-        ownerId: user.sub,
-        label: body.label,
-        threshold: body.threshold,
-      })
-      .returning();
-    return reward;
   }
 }

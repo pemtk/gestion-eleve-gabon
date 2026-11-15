@@ -10,7 +10,10 @@ import { CurrentUser, schoolOf, type AuthUser } from '../common/auth.js';
 import { DB, type Db } from '../db/db.module.js';
 import { getSubscription, schoolName } from '../db/subscription.js';
 import { PartnerService } from '../partner/partner.service.js';
-import { DashboardService } from './dashboard.service.js';
+import { AdminDashboardService } from './admin-dashboard.service.js';
+import { AgentDashboardService } from './agent-dashboard.service.js';
+import { NetworkDashboardService } from './network-dashboard.service.js';
+import { SchoolDashboardService } from './school-dashboard.service.js';
 
 /**
  * Les indicateurs sont calculés à partir des données réelles (comptes activés, tâches terminées, appels, notes, signalements) :
@@ -20,7 +23,10 @@ import { DashboardService } from './dashboard.service.js';
 export class DashboardController {
   constructor(
     @Inject(DB) private readonly db: Db,
-    private readonly dashboards: DashboardService,
+    private readonly schoolDashboard: SchoolDashboardService,
+    private readonly agentDashboard: AgentDashboardService,
+    private readonly networkDashboard: NetworkDashboardService,
+    private readonly adminDashboard: AdminDashboardService,
     private readonly partner: PartnerService,
   ) {}
 
@@ -38,7 +44,7 @@ export class DashboardController {
     if (space === 'ecole') {
       const sid = schoolOf(user);
       const { plan, suspended } = await getSubscription(this.db, sid);
-      const { body } = await this.dashboards.school(sid);
+      const { body } = await this.schoolDashboard.school(sid);
       // L'en-tête porte le nom de l'établissement connecté (pas celui du jeu de démonstration).
       const head = {
         ...data.head,
@@ -54,7 +60,7 @@ export class DashboardController {
       };
     }
     if (space === 'agent') {
-      const { body, kicker } = await this.dashboards.agent(user.sub);
+      const { body, kicker } = await this.agentDashboard.agent(user.sub);
       return {
         ...data,
         ...body,
@@ -81,7 +87,7 @@ export class DashboardController {
         statsLocked: false,
       };
     }
-    const { body } = await this.dashboards.admin();
+    const { body } = await this.adminDashboard.admin();
     return {
       ...data,
       ...body,
@@ -100,7 +106,7 @@ export class DashboardController {
         message: 'La vue réseau n’est pas incluse dans votre formule.',
       });
     }
-    const { kicker, ...body } = await this.dashboards.network(sid);
+    const { kicker, ...body } = await this.networkDashboard.network(sid);
     return {
       ...DASHBOARDS.ecole,
       ...body,

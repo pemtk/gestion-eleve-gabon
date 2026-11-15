@@ -6,7 +6,7 @@ import { DB, type Db } from '../db/db.module.js';
 import { alertsOf } from '../dashboard/alerts.js';
 import { incidents, orgSubscriptions, userScopes } from '../db/schema.js';
 import { IndicatorsService } from '../indicators/indicators.service.js';
-import { ConversationsService } from '../messaging/conversations.service.js';
+import { ConversationUnreadService } from '../messaging/conversation-unread.service.js';
 import { schoolBadges } from '../school/badges.js';
 
 /** Compteurs affichés dans la barre latérale, par adresse de menu. */
@@ -21,7 +21,7 @@ export class NavService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly indicators: IndicatorsService,
-    private readonly conversations: ConversationsService,
+    private readonly unread: ConversationUnreadService,
   ) {}
 
   async forUser(user: AuthUser): Promise<NavItem[]> {
@@ -37,7 +37,7 @@ export class NavService {
     if (user.role === 'etablissement' && user.schoolId) {
       const [b, messages] = await Promise.all([
         schoolBadges(this.db, user.schoolId),
-        this.conversations.unreadTotal(user),
+        this.unread.unreadTotal(user),
       ]);
       return {
         '/ecole/utilisateurs': b.users,

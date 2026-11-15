@@ -23,7 +23,10 @@ import {
 } from '@sge/shared';
 import { z } from 'zod';
 import { CurrentUser, Public, type AuthUser } from '../common/auth.js';
-import { AuthService } from './auth.service.js';
+import { AuthService } from './authentication.service.js';
+import { AuthSessionService } from './auth-session.service.js';
+import { PasswordService } from './password.service.js';
+import { UserLookupService } from './user-lookup.service.js';
 
 const refreshSchema = z.object({ refreshToken: z.string().min(10) });
 const resetSchema = z.object({
@@ -34,7 +37,12 @@ const resetSchema = z.object({
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly passwords: PasswordService,
+    private readonly sessions: AuthSessionService,
+    private readonly users: UserLookupService,
+  ) {}
 
   @Public()
   @Post('login')
@@ -79,7 +87,7 @@ export class AuthController {
     body: { phone: string },
     @Ip() ip: string,
   ) {
-    return this.auth.forgot(body.phone, ip);
+    return this.passwords.forgot(body.phone, ip);
   }
 
   @Public()
@@ -88,7 +96,7 @@ export class AuthController {
     @Body({ schema: resetSchema }) body: z.infer<typeof resetSchema>,
     @Ip() ip: string,
   ) {
-    return this.auth.reset(body.phone, body.code, body.password, ip);
+    return this.passwords.reset(body.phone, body.code, body.password, ip);
   }
 
   @Post('password/change')
@@ -99,7 +107,13 @@ export class AuthController {
     @Headers('x-refresh-token') keep: string | undefined,
     @Ip() ip: string,
   ) {
-    return this.auth.changePassword(user, body.current, body.next, keep, ip);
+    return this.passwords.changePassword(
+      user,
+      body.current,
+      body.next,
+      keep,
+      ip,
+    );
   }
 
   /** Renouvelle la session avec le jeton de renouvellement (rotation : l'ancien ne sert qu'une fois). */
@@ -110,7 +124,7 @@ export class AuthController {
     @Body({ schema: refreshSchema }) body: z.infer<typeof refreshSchema>,
     @Ip() ip: string,
   ) {
-    return this.auth.renew(body.refreshToken, ip);
+    return this.sessions.renew(body.refreshToken, ip);
   }
 
   /** Déconnexion de cet appareil : le jeton de renouvellement est révoqué. */
@@ -118,14 +132,14 @@ export class AuthController {
   @Post('logout')
   @HttpCode(200)
   logout(@Body({ schema: refreshSchema }) body: z.infer<typeof refreshSchema>) {
-    return this.auth.logout(body.refreshToken);
+    return this.sessions.logout(body.refreshToken);
   }
 
   /** Déconnexion de tous les appareils. */
   @Post('logout-all')
   @HttpCode(200)
   logoutAll(@CurrentUser() user: AuthUser, @Ip() ip: string) {
-    return this.auth.logoutAll(user, ip);
+    return this.sessions.logoutAll(user, ip);
   }
 
   /** Premier mot de passe d'un compte qui n'en a pas (activé par code SMS). */
@@ -135,15 +149,15 @@ export class AuthController {
     @Body({ schema: passwordSetSchema })
     body: z.infer<typeof passwordSetSchema>,
   ) {
-    return this.auth.setPassword(user.phone, body.next);
+    return this.passwords.setPassword(user.phone, body.next);
   }
 
   @Get('me')
   async me(@CurrentUser() user: AuthUser) {
     return {
-      ...(await this.auth.me(user.phone)),
-      hasPassword: await this.auth.hasPassword(user.phone),
-      avatarFileId: await this.auth.avatarOf(user.sub),
+      ...(await this.users.me(user.phone)),
+      hasPassword: await this.users.hasPassword(user.phone),
+      avatarFileId: await this.users.avatarOf(user.sub),
     };
   }
 
