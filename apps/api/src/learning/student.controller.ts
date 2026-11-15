@@ -4,6 +4,7 @@ import { BADGES, POINTS_HISTORY, selfEvaluationSchema } from '@sge/shared';
 import { z } from 'zod';
 import { CurrentUser, Roles, schoolOf, type AuthUser } from '../common/auth.js';
 import { DB, type Db } from '../db/db.module.js';
+import { FilesService } from '../files/files.service.js';
 import { learner, taskCompletions, tasks, workSessions } from '../db/schema.js';
 import { completionsOf, studentOf, taskStatusOf, tasksOfClass } from './context.js';
 import { getLearner } from './learner.js';
@@ -12,13 +13,14 @@ import { overallAverage, recentGrades, subjectResults } from './results.js';
 const POINTS_PER_TASK = 20;
 /** Seuil sous lequel une complétion est signalée à l'enseignant (§4.3 : peut être invalidée). */
 const MIN_SECONDS = 60;
-const completeSchema = selfEvaluationSchema.omit({ taskId: true });
+/** `proofFileId` : photo envoyée au préalable (`POST /files`, usage « proof »). L'indicateur `proof` du client n'est plus cru : seule la photo compte. */
+const completeSchema = selfEvaluationSchema.omit({ taskId: true, proof: true }).extend({ proofFileId: z.string().optional() });
 
 /** Espace élève : tâches de SA classe, avancement et notes propres à CET élève. */
 @Roles('eleve')
 @Controller('me/student')
 export class StudentController {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(@Inject(DB) private readonly db: Db, private readonly files: FilesService) {}
 
   /** Tâches de la classe de l'élève, chacune avec son statut personnel. */
   private async myTasks(user: AuthUser) {
@@ -69,12 +71,18 @@ export class StudentController {
     const me = await studentOf(this.db, user);
     const [t] = me ? await this.db.select().from(tasks).where(and(eq(tasks.id, id), eq(tasks.schoolId, me.schoolId), eq(tasks.classId, me.classId))) : [];
     if (!me || !t) throw new NotFoundException('Tâche introuvable.');
+    // Devoir avec photo obligatoire (§4.3) : on ne peut pas valider sans.
+    if (t.type === 'Devoir' && t.requirePhoto && !body.proofFileId) throw new BadRequestException('La photo du devoir est obligatoire pour valider cette tâche.');
     await getLearner(this.db, user.sub);
     return this.db.transaction(async (tx) => {
-      const [c] = await tx.insert(taskCompletions).values({ taskId: id, studentId: me.id, status: 'done', seconds: body.seconds, evaluation: body.evaluation, proof: body.proof, points: POINTS_PER_TASK, completedAt: new Date() })
-        .onConflictDoUpdate({ target: [taskCompletions.taskId, taskCompletions.studentId], set: { status: 'done', seconds: body.seconds, evaluation: body.evaluation, proof: body.proof, points: POINTS_PER_TASK, completedAt: new Date(), invalidatedAt: null }, setWhere: ne(taskCompletions.status, 'done') })
+      const [c] = await tx.insert(taskCompletions).values({ taskId: id, studentId: me.id, status: 'done', seconds: body.seconds, evaluation: body.evaluation, proof: !!body.proofFileId, points: POINTS_PER_TASK, completedAt: new Date() })
+        .onConflictDoUpdate({ target: [taskCompletions.taskId, taskCompletions.studentId], set: { status: 'done', seconds: body.seconds, evaluation: body.evaluation, proof: !!body.proofFileId, proofFileId: null, points: POINTS_PER_TASK, completedAt: new Date(), invalidatedAt: null }, setWhere: ne(taskCompletions.status, 'done') })
         .returning();
       if (!c) throw new BadRequestException('Cette tâche est déjà terminée.');
+      if (body.proofFileId) {
+        await this.files.attach(tx, user, body.proofFileId, 'proof', 'task_completion', `${id}:${me.id}`);
+        await tx.update(taskCompletions).set({ proofFileId: body.proofFileId }).where(and(eq(taskCompletions.taskId, id), eq(taskCompletions.studentId, me.id)));
+      }
       await tx.insert(workSessions).values({ userId: user.sub, seconds: body.seconds });
       const entry = JSON.stringify([{ label: t.title, when: 'Aujourd’hui', points: `+${POINTS_PER_TASK}` }]);
       const [l] = await tx.update(learner).set({

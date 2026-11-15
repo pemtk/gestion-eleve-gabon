@@ -1,11 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { useState } from 'react';
-import { Linking, Pressable, Switch, Text, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Image, Linking, Pressable, Switch, Text, TextInput, View } from 'react-native';
 import { FAQ, SUPPORT, TIPS, initials, isPasswordValid, passwordRules, type Message, type ThreadSummary } from '@sge/shared';
 import { Icon } from '@/components/icon';
 import { Avatar, B, Btn, Card, Field, H, Header, Kicker, ListRow, Loading, Muted, Rules, Screen, Seg } from '@/components/ui';
 import { api, ApiError, getRefreshToken } from '@/lib/api';
+import { RemoteImage } from '@/components/remote-image';
+import { pickPhoto, uploadPhoto, type Picked } from '@/lib/files';
 import { ROLE_PREFIX, useSession } from '@/lib/session';
 import { useApi } from '@/lib/use-api';
 import { C, F, R } from '@/theme';
@@ -144,21 +146,37 @@ export function ProfilEdit() {
   const [first, setFirst] = useState(user?.name.split(' ')[0] ?? '');
   const [last, setLast] = useState(user?.name.split(' ').slice(1).join(' ') ?? '');
   const [vis, setVis] = useState<'school' | 'teachers' | 'private'>('school');
-  const [photo, setPhoto] = useState<string | null>(null);
+  const current = useApi<{ photoVisibility: 'school' | 'teachers' | 'private'; avatarFileId: string | null }>('/me/profile');
+  const [photo, setPhoto] = useState<Picked | null>(null);
+  const [removed, setRemoved] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const pick = async () => {
-    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.6 });
-    if (!r.canceled) setPhoto(r.assets[0]?.uri ?? null);
+  useEffect(() => { if (current.data && !loaded) { setVis(current.data.photoVisibility); setLoaded(true); } }, [current.data, loaded]);
+  const avatarFileId = removed ? null : current.data?.avatarFileId ?? null;
+  const pick = async (source: 'camera' | 'library') => {
+    setError(null);
+    try { const p = await pickPhoto(source, { square: true }); if (p) { setPhoto(p); setRemoved(false); } } catch (e) { setError(e instanceof Error ? e.message : 'Photo impossible.'); }
   };
   const save = async () => {
-    try { await api.put('/me/profile', { firstName: first, lastName: last, photoVisibility: vis }); router.back(); } catch (e) { setError(e instanceof ApiError ? e.message : 'Enregistrement impossible.'); }
+    try {
+      await api.put('/me/profile', { firstName: first, lastName: last, photoVisibility: vis });
+      if (photo) await api.put('/me/avatar', { fileId: await uploadPhoto('avatar', photo) });
+      else if (removed && current.data?.avatarFileId) await api.del('/me/avatar');
+      router.back();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Enregistrement impossible.'); }
   };
   return (
     <Screen gap={18}>
       <Header title="Nom et photo" />
       <View style={{ alignItems: 'center', gap: 8 }}>
-        {photo ? <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: C.n[300], alignItems: 'center', justifyContent: 'center' }}><Icon name="image" size={30} color={C.n[700]} /></View> : <Avatar initials={initials(`${first} ${last}`)} size={96} />}
-        <Btn variant="link" label={photo ? 'Changer la photo' : 'Ajouter une photo'} onPress={pick} />
+        {photo ? <Image source={{ uri: photo.uri }} style={{ width: 96, height: 96, borderRadius: 48 }} accessibilityLabel="Nouvelle photo de profil" />
+          : avatarFileId ? <RemoteImage fileId={avatarFileId} size={96} round />
+          : <Avatar initials={initials(`${first} ${last}`)} size={96} />}
+        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <Btn variant="link" label="Prendre une photo" icon="camera" onPress={() => pick('camera')} />
+          <Btn variant="link" label={photo || avatarFileId ? 'Changer (galerie)' : 'Galerie'} icon="image" onPress={() => pick('library')} />
+          {(photo || avatarFileId) && <Btn variant="link" label="Retirer" onPress={() => { setPhoto(null); setRemoved(true); }} />}
+        </View>
       </View>
       <View style={{ flexDirection: 'row', gap: 10 }}><View style={{ flex: 1 }}><Field label="Prénom" value={first} onChangeText={setFirst} /></View><View style={{ flex: 1 }}><Field label="Nom" value={last} onChangeText={setLast} /></View></View>
       <View style={{ gap: 8 }}><Muted size={13}>Qui peut voir ma photo ?</Muted>

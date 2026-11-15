@@ -1,13 +1,17 @@
 import { Body, ConflictException, Controller, Get, Inject, NotFoundException, Post, Put } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { classInputSchema, schoolYearSchema } from '@sge/shared';
+import { classInputSchema, pct, schoolYearSchema } from '@sge/shared';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { CurrentUser, Roles, schoolOf, type AuthUser } from '../common/auth.js';
 import { DB, type Db } from '../db/db.module.js';
 import { isForeignKeyViolation, isUniqueViolation } from '../db/errors.js';
 import { assignments, classes, schoolYears, teachers } from '../db/schema.js';
+import { getSetting, setSetting } from '../db/settings.js';
+import { IndicatorsService } from '../indicators/indicators.service.js';
 import { SchoolPolicy } from './school.policy.js';
+
+const photoSettingsSchema = z.object({ proofVisibleToParents: z.boolean() });
 
 const assignmentSchema = z.object({
   teacherId: z.string().min(1), classId: z.string().min(1), subject: z.string().trim().min(1),
@@ -17,7 +21,21 @@ const assignmentSchema = z.object({
 @Roles('etablissement')
 @Controller('school')
 export class SchoolConfigController {
-  constructor(@Inject(DB) private readonly db: Db, private readonly policy: SchoolPolicy) {}
+  constructor(@Inject(DB) private readonly db: Db, private readonly policy: SchoolPolicy, private readonly indicators: IndicatorsService) {}
+
+  /** §11.3 — les photos de preuve sont vues de l'enseignant ; le parent ne les voit que si l'école l'autorise. */
+  @Get('photo-settings')
+  photoSettings(@CurrentUser() user: AuthUser) {
+    return getSetting(this.db, schoolOf(user), 'photos');
+  }
+
+  @Put('photo-settings')
+  async savePhotoSettings(@CurrentUser() user: AuthUser, @Body({ schema: photoSettingsSchema }) body: z.infer<typeof photoSettingsSchema>) {
+    const sid = schoolOf(user);
+    await this.policy.assertWritable(sid);
+    await setSetting(this.db, sid, 'photos', body);
+    return body;
+  }
 
   @Get('year')
   async year(@CurrentUser() user: AuthUser) {
@@ -45,8 +63,12 @@ export class SchoolConfigController {
 
   @Get('classes')
   async classes(@CurrentUser() user: AuthUser) {
-    const rows = await this.db.select().from(classes).where(eq(classes.schoolId, schoolOf(user))).orderBy(classes.id);
-    return rows.map(({ studentCount, schoolId: _s, ...c }) => ({ ...c, students: studentCount }));
+    const sid = schoolOf(user);
+    const rows = await this.db.select().from(classes).where(eq(classes.schoolId, sid)).orderBy(classes.id);
+    // La complétion est mesurée (tâches terminées sur 7 jours), pas la valeur figée de la démonstration ; null = rien à mesurer.
+    const [stats] = await this.indicators.schools([sid], 7);
+    const measured = new Map((stats?.classes ?? []).map((c) => [c.id, pct(c.done, c.expected)]));
+    return rows.map(({ studentCount, schoolId: _s, completion: _stored, alert: _alert, ...c }) => ({ ...c, students: studentCount, completion: measured.get(c.id) ?? null }));
   }
 
   @Post('classes')

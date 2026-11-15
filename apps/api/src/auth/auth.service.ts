@@ -170,6 +170,11 @@ export class AuthService {
     return { ok: true };
   }
 
+  async avatarOf(userId: string): Promise<string | null> {
+    const [u] = await this.db.select({ id: users.avatarFileId }).from(users).where(eq(users.id, userId));
+    return u?.id ?? null;
+  }
+
   async hasPassword(phone: string): Promise<boolean> {
     return !!(await this.findByPhone(phone))?.passwordHash;
   }

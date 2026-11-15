@@ -11,15 +11,16 @@ import type { Route } from './+types/config';
 
 type Year = typeof SCHOOL_YEAR;
 type Assignment = { id: string; teacherId: string; classId: string; teacher: string; className: string; subject: string; year: string; principal: boolean };
-const TABS = ['annees', 'classes', 'affect'] as const;
+const TABS = ['annees', 'classes', 'affect', 'photos'] as const;
 
 export async function loader({ request }: Route.LoaderArgs) {
   const api = await spaceApi(request, 'ecole');
   const t = new URL(request.url).searchParams.get('tab');
-  const [year, classes, assignments, teachers] = await Promise.all([
+  const [year, classes, assignments, teachers, photos] = await Promise.all([
     api.get<Year>('/school/year'), api.get<ClassRow[]>('/school/classes'), api.get<Assignment[]>('/school/assignments'), api.get<TeacherRow[]>('/school/teachers'),
+    api.get<{ proofVisibleToParents: boolean }>('/school/photo-settings'),
   ]);
-  return { tab: TABS.find((x) => x === t) ?? 'annees', year, classes, assignments, teachers };
+  return { tab: TABS.find((x) => x === t) ?? 'annees', year, classes, assignments, teachers, photos };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -35,6 +36,8 @@ export async function action({ request }: Route.ActionArgs) {
     }
     case 'class':
       return run(() => api.post('/school/classes', { level: str(fd, 'level'), name: str(fd, 'name'), capacity: Number(str(fd, 'capacity')) }), 'Classe créée.');
+    case 'photos':
+      return run(() => api.put('/school/photo-settings', { proofVisibleToParents: flag(fd, 'proofVisibleToParents') }), 'Réglage des photos enregistré.');
     case 'assign':
       return run(() => api.post('/school/assignments', { teacherId: str(fd, 'teacherId'), classId: str(fd, 'classId'), subject: str(fd, 'subject'), year: str(fd, 'year'), principal: flag(fd, 'principal') }), 'Affectation enregistrée.');
   }
@@ -51,11 +54,13 @@ export default function Config({ loaderData: d, actionData }: Route.ComponentPro
         { to: link('annees'), label: 'Années scolaires', active: d.tab === 'annees' },
         { to: link('classes'), label: 'Classes', badge: String(d.classes.length), active: d.tab === 'classes' },
         { to: link('affect'), label: 'Affectations enseignants', active: d.tab === 'affect' },
+        { to: link('photos'), label: 'Photos', active: d.tab === 'photos' },
       ]} />
       <ActionNotice result={actionData ?? undefined} />
       {d.tab === 'annees' && <YearForm year={d.year} />}
       {d.tab === 'classes' && <Classes classes={d.classes} />}
       {d.tab === 'affect' && <Assignments d={d} />}
+      {d.tab === 'photos' && <Photos proofVisibleToParents={d.photos.proofVisibleToParents} />}
     </>
   );
 }
@@ -148,5 +153,20 @@ function Assignments({ d }: { d: Route.ComponentProps['loaderData'] }) {
         </Form>
       </Section>
     </div>
+  );
+}
+
+/** §11.3 — les photos de preuve sont vues de l'enseignant ; le parent seulement si l'école le décide. */
+function Photos({ proofVisibleToParents }: { proofVisibleToParents: boolean }) {
+  const [parents, setParents] = useState(proofVisibleToParents);
+  return (
+    <Section title="Photos de preuve">
+      <Form method="post" className="flex max-w-xl flex-col gap-4">
+        <input type="hidden" name="intent" value="photos" />
+        <p className="text-[14px] text-neutral-700">Quand un élève joint une photo de son cahier ou de son devoir, seul son enseignant la voit. La direction n’y a pas accès.</p>
+        <Toggle name="proofVisibleToParents" label="Les parents voient les photos de leur enfant" sub="Désactivé par défaut" checked={parents} onChange={setParents} />
+        <div><Button type="submit" icon="save">Enregistrer</Button></div>
+      </Form>
+    </Section>
   );
 }

@@ -75,7 +75,7 @@ export class AuthController {
 
   @Get('me')
   async me(@CurrentUser() user: AuthUser) {
-    return { ...(await this.auth.me(user.phone)), hasPassword: await this.auth.hasPassword(user.phone) };
+    return { ...(await this.auth.me(user.phone)), hasPassword: await this.auth.hasPassword(user.phone), avatarFileId: await this.auth.avatarOf(user.sub) };
   }
 
   @Public() @Post('demo/:role')

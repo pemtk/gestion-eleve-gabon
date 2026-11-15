@@ -16,15 +16,19 @@ let onTokens: (access: string, refresh: string) => void = () => undefined;
 let onExpired: () => void = () => undefined;
 export const setTokens = (access: string | null, refresh: string | null) => { token = access; refreshToken = refresh; };
 export const getRefreshToken = () => refreshToken;
+/** En-tête d'authentification pour les images chargées par l'application (les fichiers ne sont jamais publics). */
+export const authHeader = (): Record<string, string> => (token ? { Authorization: `Bearer ${token}` } : {});
 export const onSession = (handlers: { tokens: typeof onTokens; expired: typeof onExpired }) => { onTokens = handlers.tokens; onExpired = handlers.expired; };
 
 async function send(method: string, path: string, body?: unknown, headers?: Record<string, string>) {
   let res: Response;
   try {
+    // Un envoi de fichier part en multipart : le Content-Type (avec sa frontière) est fixé par la plateforme.
+    const multipart = body instanceof FormData;
     res = await fetch(`${API_URL}${path}`, {
       method,
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: { ...(multipart ? {} : { 'Content-Type': 'application/json' }), ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers },
+      body: body === undefined ? undefined : multipart ? body : JSON.stringify(body),
     });
   } catch {
     throw new NetworkError('Pas de réseau.');
@@ -67,4 +71,6 @@ export const api = {
   get: <T>(p: string) => request<T>('GET', p),
   post: <T>(p: string, b?: unknown, h?: Record<string, string>) => request<T>('POST', p, b, h),
   put: <T>(p: string, b?: unknown) => request<T>('PUT', p, b),
+  del: <T>(p: string) => request<T>('DELETE', p),
+  upload: <T>(p: string, form: FormData) => request<T>('POST', p, form),
 };

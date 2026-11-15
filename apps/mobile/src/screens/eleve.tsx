@@ -1,9 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Image, Pressable, Text, View } from 'react-native';
 import { formatGrade, formatInt, formatTimer, type BadgeLike } from './types';
 import { Icon } from '@/components/icon';
 import { Avatar, B, Btn, Card, H, Header, Kicker, ListRow, Loading, Muted, Num, Pill, Ring, Screen, SectionTitle } from '@/components/ui';
+import { pickPhoto, uploadPhoto, type Picked } from '@/lib/files';
 import { useApi } from '@/lib/use-api';
 import { useSession } from '@/lib/session';
 import { C, F, R } from '@/theme';
@@ -145,18 +146,26 @@ export function Tache() {
 export function AutoEval() {
   const { id, sec, title } = useLocalSearchParams<{ id: string; sec: string; title?: string }>();
   const router = useRouter();
-  const { send } = useSession();
+  const { send, offline } = useSession();
   const [choice, setChoice] = useState<'ok' | 'doubt' | null>(null);
-  const [proof, setProof] = useState(false);
+  const [photo, setPhoto] = useState<Picked | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const validate = async () => {
     if (!choice) return;
     setBusy(true);
+    setError(null);
     try {
-      const res = await send<{ gained: number; points: number; streak: number; message: string }>('POST', `/me/student/tasks/${id}/complete`, { evaluation: choice, proof, seconds: Number(sec) });
+      // La photo est envoyée d'abord (elle n'est pas gardée hors ligne) ; la validation, elle, peut attendre le retour du réseau.
+      if (photo && offline) throw new Error('Pas de réseau : la photo ne peut pas être envoyée maintenant. Retire-la pour valider, ou réessaie avec du réseau.');
+      const proofFileId = photo ? await uploadPhoto('proof', photo) : undefined;
+      const res = await send<{ gained: number; points: number; streak: number; message: string }>('POST', `/me/student/tasks/${id}/complete`, { evaluation: choice, proofFileId, seconds: Number(sec) });
       router.replace({ pathname: '/eleve/bravo', params: { gained: String(res.data?.gained ?? 20), points: String(res.data?.points ?? ''), streak: String(res.data?.streak ?? ''), queued: res.queued ? '1' : '', note: res.data?.message ?? '' } });
     } catch (e) { setError(e instanceof Error ? e.message : 'Erreur'); setBusy(false); }
+  };
+  const take = async (source: 'camera' | 'library') => {
+    setError(null);
+    try { const p = await pickPhoto(source); if (p) setPhoto(p); } catch (e) { setError(e instanceof Error ? e.message : 'Photo impossible.'); }
   };
   return (
     <Screen gap={18}>
@@ -170,10 +179,19 @@ export function AutoEval() {
           </Pressable>
         ))}
       </View>
-      <Pressable onPress={() => setProof((p) => !p)} accessibilityRole="button" style={{ minHeight: 76, padding: 14, borderRadius: R.lg, borderWidth: 1.5, borderStyle: 'dashed', borderColor: proof ? C.accent : C.a[400], flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: C.a[100], alignItems: 'center', justifyContent: 'center' }}><Icon name={proof ? 'circle-check' : 'camera'} size={20} color={C.a[800]} /></View>
-        <View><B>{proof ? 'Photo ajoutée' : 'Ajouter une preuve'}</B><Muted size={12}>Facultatif · photo de ton cahier</Muted></View>
-      </Pressable>
+      <View style={{ padding: 14, borderRadius: R.lg, borderWidth: 1.5, borderStyle: 'dashed', borderColor: photo ? C.accent : C.a[400], gap: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          {photo
+            ? <Image source={{ uri: photo.uri }} style={{ width: 64, height: 64, borderRadius: 8 }} accessibilityLabel="Photo ajoutée" />
+            : <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: C.a[100], alignItems: 'center', justifyContent: 'center' }}><Icon name="camera" size={20} color={C.a[800]} /></View>}
+          <View style={{ flex: 1 }}><B>{photo ? 'Photo ajoutée' : 'Ajouter une preuve'}</B><Muted size={12}>Facultatif · photo de ton cahier. Seul ton enseignant la voit.</Muted></View>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+          <Btn variant="link" label="Prendre une photo" icon="camera" onPress={() => take('camera')} />
+          <Btn variant="link" label="Galerie" icon="image" onPress={() => take('library')} />
+          {photo && <Btn variant="link" label="Retirer" onPress={() => setPhoto(null)} />}
+        </View>
+      </View>
       {error && <B color={C.a[800]}>{error}</B>}
       <Btn label="Valider" onPress={validate} disabled={!choice || busy} />
     </Screen>

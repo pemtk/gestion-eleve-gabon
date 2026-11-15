@@ -1,3 +1,6 @@
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
@@ -11,6 +14,8 @@ import { seedDemo } from '../src/db/seed.js';
 /** Démarre l'application sur la base de DATABASE_URL (migrations appliquées) avec le jeu de démonstration remis à zéro. */
 export async function createApp(): Promise<INestApplication<App>> {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL est requis pour les tests d’intégration (ex. postgres://sge:sge@localhost:5432/sge_test).');
+  // Les fichiers des tests vont dans un dossier jetable, jamais dans le dossier de travail.
+  if (!process.env.FILES_DRIVER) process.env.FILES_DIR = await mkdtemp(join(tmpdir(), 'sge-test-files-'));
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   const app = moduleRef.createNestApplication<INestApplication<App>>();
   configureApp(app);

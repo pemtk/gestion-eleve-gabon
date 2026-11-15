@@ -139,6 +139,31 @@ province n'apparaît pas dans le tableau par région. La vue réseau regroupe le
   l'hébergeur (voir #14). Si une exigence réglementaire l'impose ensuite : chiffrement AES-256-GCM par colonne avec clé en variable
   d'environnement (ou KMS) et identifiant de clé stocké avec la valeur, pour permettre la rotation.
 
+## Fichiers (photos de preuve, photos de profil, pièces jointes)
+
+Les fichiers passent tous par `POST /files` (`multipart/form-data` : `kind` + `file`), puis sont **rattachés** à l'objet qui les porte
+(validation d'une tâche, photo de profil, annonce, compte-rendu de visite). Un fichier envoyé mais jamais utilisé est supprimé au bout de 24 h.
+
+| Usage (`kind`) | Qui l'envoie | Formats | Taille max. | Qui le lit |
+| --- | --- | --- | --- | --- |
+| `proof` — photo du cahier ou du devoir | l'élève | JPEG, PNG, WebP | 5 Mo | l'élève, **les enseignants de la classe** ; le parent de l'élève **seulement si l'école l'autorise** (Configuration → Photos, §11.3). Pas la direction. |
+| `avatar` — photo de profil | élève, parent, enseignant | JPEG, PNG, WebP | 2 Mo | selon le choix de l'utilisateur : école, enseignants seulement, ou privée |
+| `attachment` — pièce jointe d'annonce | la direction | JPEG, PNG, WebP, PDF | 5 Mo | selon l'audience de l'annonce (élèves, parents, enseignants de l'école concernés) |
+| `report` — compte-rendu de visite | l'agent | JPEG, PNG, WebP, PDF | 10 Mo | l'agent, l'administrateur, et la direction de l'école si le compte-rendu lui est partagé |
+| `message` — image de message | élève, parent, enseignant | JPEG, PNG, WebP | 3 Mo | participants du fil (messagerie) |
+
+- **Contrôles** : le type réel est lu dans les octets (jamais dans l'extension ni l'en-tête annoncé), la taille est limitée par usage, le nom est
+  nettoyé, 30 envois par heure et par utilisateur. SVG, HTML, GIF, exécutables… sont refusés. Les métadonnées des JPEG (position GPS, appareil,
+  date) sont retirées avant stockage ; seule l'orientation est conservée. Les PNG et WebP ne sont pas nettoyés.
+- **Lecture** : `GET /files/:id` (session, droits ci-dessus, sinon `404`) ; `GET /files/:id/url` donne un **lien signé de 5 minutes**
+  (présigné S3 si le stockage est S3, sinon signature HMAC de l'API). Les PDF se téléchargent, les images s'affichent. Les consultations d'une
+  photo de preuve par un tiers (enseignant, parent) et les refus sont inscrits au journal d'audit. Le web relaie les fichiers avec la session
+  (`/fichiers/:id`) : le navigateur n'a ni jeton ni lien direct vers le stockage.
+- **Stockage** : disque (`FILES_DIR`, volume Docker `files`) par défaut ; `FILES_DRIVER=s3` + `FILES_S3_*` pour un stockage objet compatible S3.
+  Le pilote S3 est testé contre un faux serveur S3 local (requêtes signées, liens présignés), pas encore contre un service réel.
+- **Limites connues** : pas d'antivirus ; photo hors ligne non gardée (l'élève valide sans photo ou attend le réseau) ; les images de messagerie
+  arrivent avec le ticket de la messagerie (#21).
+
 ## Base de données
 
 PostgreSQL via [Drizzle ORM](https://orm.drizzle.team) : schéma dans `apps/api/src/db/schema.ts`,
@@ -191,7 +216,6 @@ Production : `JWT_SECRET` (API) et `SESSION_SECRET` (web) sont **obligatoires** 
 - **Défense en profondeur** : le cloisonnement est appliqué par l'application et par des contraintes ; PostgreSQL
   *Row Level Security* (politiques sur `school_id`) pourrait s'y ajouter pour qu'un oubli de filtre soit sans effet.
 - **SMS** : `SmsGateway` journalise les messages ; brancher l'opérateur SMS (OTP, alertes, invitations).
-- **Fichiers** : photos de preuve, pièces jointes et images de messagerie sont des indicateurs, sans stockage.
 - **QR code** : l'écran « scanner » du parent est une maquette ; la saisie du code à 6 chiffres est fonctionnelle.
 - **Notifications push** : l'interrupteur est en place, l'envoi (Expo Push) reste à brancher.
 

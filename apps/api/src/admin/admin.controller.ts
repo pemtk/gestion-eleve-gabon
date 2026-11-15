@@ -1,11 +1,12 @@
 import { BadRequestException, Body, Controller, Get, Inject, NotFoundException, Param, Patch, Post, Put } from '@nestjs/common';
-import { and, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm';
 import { inviteSchema, organizationSchema, subscriptionSchema, type Plan } from '@sge/shared';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { Roles } from '../common/auth.js';
 import { DB, type Db } from '../db/db.module.js';
-import { incidents, institutionalUsers, organizations, orgSubscriptions, userScopes } from '../db/schema.js';
+import { files, incidents, institutionalUsers, organizations, orgSubscriptions, userScopes, visitReports } from '../db/schema.js';
+import { toStored } from '../files/files.service.js';
 import { AccountsService } from '../accounts/accounts.service.js';
 
 const localisation = organizationSchema.pick({ province: true, level: true });
@@ -106,6 +107,13 @@ export class AdminController {
     });
     this.accounts.invite(result.account);
     return result.row;
+  }
+
+  /** Comptes-rendus de visite des agents (§8.3) : visibles de l'administrateur, avec leur pièce jointe. */
+  @Get('reports')
+  async reports() {
+    const rows = await this.db.select({ r: visitReports, f: files }).from(visitReports).leftJoin(files, eq(files.id, visitReports.attachmentFileId)).orderBy(desc(visitReports.id));
+    return rows.map(({ r, f }) => ({ ...r, attachment: f ? toStored(f) : null }));
   }
 
   @Get('incidents')
