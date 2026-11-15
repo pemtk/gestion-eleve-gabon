@@ -3,6 +3,7 @@ import { DASHBOARDS, ROLE_OF_SPACE, WEB_NAV, planHas, type WebSpace } from '@sge
 import { CurrentUser, schoolOf, type AuthUser } from '../common/auth.js';
 import { DB, type Db } from '../db/db.module.js';
 import { getSubscription, schoolName } from '../db/subscription.js';
+import { ConversationsService } from '../messaging/conversations.service.js';
 import { PartnerService } from '../partner/partner.service.js';
 import { DashboardService, withBadges } from './dashboard.service.js';
 
@@ -12,7 +13,7 @@ import { DashboardService, withBadges } from './dashboard.service.js';
  */
 @Controller('dashboard')
 export class DashboardController {
-  constructor(@Inject(DB) private readonly db: Db, private readonly dashboards: DashboardService, private readonly partner: PartnerService) {}
+  constructor(@Inject(DB) private readonly db: Db, private readonly dashboards: DashboardService, private readonly partner: PartnerService, private readonly conversations: ConversationsService) {}
 
   /** Un profil ne voit que son propre espace ; les tableaux avancés dépendent de la formule (écoles). */
   @Get(':space')
@@ -24,6 +25,7 @@ export class DashboardController {
       const sid = schoolOf(user);
       const { plan, suspended } = await getSubscription(this.db, sid);
       const { body, badges } = await this.dashboards.school(sid);
+      badges['/ecole/messages'] = await this.conversations.unreadTotal(user);
       // L'en-tête porte le nom de l'établissement connecté (pas celui du jeu de démonstration).
       const head = { ...data.head, kicker: `${await schoolName(this.db, sid)} · année 2026–2027` };
       return { ...data, ...body, head, nav: withBadges(nav, badges), plan, suspended, statsLocked: !planHas(plan).stats };

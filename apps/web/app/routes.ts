@@ -16,6 +16,7 @@ export default [
       route('absences', 'routes/ecole/absences.tsx'),
       route('resultats', 'routes/ecole/results.tsx'),
       route('annonces', 'routes/ecole/announcements.tsx'),
+      route('messages', 'routes/ecole/messages.tsx'),
       route('vie-scolaire', 'routes/ecole/referent.tsx'),
       route('vie-scolaire/:caseId', 'routes/ecole/case.tsx'),
       route('reseau', 'routes/ecole/network.tsx'),

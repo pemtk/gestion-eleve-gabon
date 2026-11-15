@@ -1,1 +1,1 @@
-export { Thread as default } from '@/screens/shared';
+export { ThreadScreen as default } from '@/features/messaging';

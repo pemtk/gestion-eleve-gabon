@@ -113,15 +113,32 @@ export interface ThreadSummary {
   time: string;
   unread: number;
   icon?: string;
+  /** Groupe (classe, équipe) ou conversation à deux ; l'utilisateur peut-il y écrire (fil de classe réservé à l'enseignant, par exemple) ? */
+  group?: boolean;
+  canPost?: boolean;
 }
 export interface Message {
+  /** Identifiant client (idempotence de l'envoi hors ligne). */
   id: string;
+  /** Rang du message dans le fil : curseur d'actualisation et de lecture. */
+  seq?: number;
   mine: boolean;
   text: string | null;
   image?: boolean;
+  /** Image jointe (fichier de l'usage « message »). */
+  fileId?: string;
+  /** Auteur, pour les fils de groupe. */
+  sender?: string;
   time: string;
   /** Hors ligne : l'envoi est en attente. */
   pending?: boolean;
+}
+/** Personne que l'on peut écrire (`POST /threads`) ; la clé est opaque. */
+export interface Contact {
+  key: string;
+  name: string;
+  label: string;
+  initials: string;
 }
 
 export interface NotificationItem {

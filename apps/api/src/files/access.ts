@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import type { AuthUser } from '../common/auth.js';
 import type { Db } from '../db/db.module.js';
 import { getSetting } from '../db/settings.js';
+import { accessOf, conversationById } from '../messaging/access.js';
 import { announcements, assignments, files, studentParents, students, tasks, teachers, users, visitReports } from '../db/schema.js';
 
 type FileRow = typeof files.$inferSelect;
@@ -80,7 +81,12 @@ export async function canRead(db: Db, user: AuthUser, f: FileRow): Promise<boole
       const [r] = await db.select().from(visitReports).where(eq(visitReports.id, Number(f.refId)));
       return !!r && user.role === 'etablissement' && r.visibleToSchool && user.schoolId === r.schoolId;
     }
+    case 'message': {
+      // Image de message : lisible de ceux qui peuvent lire la conversation à laquelle elle est jointe.
+      const conv = await conversationById(db, f.refId);
+      return !!conv && (await accessOf(db, user, conv)).read;
+    }
     default:
-      return false; // « message » : droits définis par la messagerie
+      return false;
   }
 }

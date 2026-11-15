@@ -161,8 +161,29 @@ Les fichiers passent tous par `POST /files` (`multipart/form-data` : `kind` + `f
   (`/fichiers/:id`) : le navigateur n'a ni jeton ni lien direct vers le stockage.
 - **Stockage** : disque (`FILES_DIR`, volume Docker `files`) par défaut ; `FILES_DRIVER=s3` + `FILES_S3_*` pour un stockage objet compatible S3.
   Le pilote S3 est testé contre un faux serveur S3 local (requêtes signées, liens présignés), pas encore contre un service réel.
-- **Limites connues** : pas d'antivirus ; photo hors ligne non gardée (l'élève valide sans photo ou attend le réseau) ; les images de messagerie
-  arrivent avec le ticket de la messagerie (#21).
+- **Limites connues** : pas d'antivirus ; photo hors ligne non gardée (l'élève valide sans photo ou attend le réseau).
+
+## Messagerie
+
+Trois types de conversations, créées à la demande et jamais lues d'après l'URL : les **droits se déduisent de l'appartenance** de l'utilisateur.
+
+| Conversation | Qui y est | Qui écrit |
+| --- | --- | --- |
+| Privée (deux personnes) | les deux participants | les deux |
+| Privée « Administration » (un parent) | le parent et **toute la direction** de l'école | les deux |
+| Classe — élèves | les enseignants de la classe et ses élèves | les deux |
+| Classe — parents | les enseignants de la classe, les parents de ses élèves, la direction | enseignants et direction ; **les parents lisent seulement** |
+| École (équipe) | les enseignants et la direction de l'école | les deux |
+
+- **Qui peut écrire à qui** (`GET /threads/contacts`, `POST /threads`) : un parent écrit à l'administration et aux enseignants de la classe de ses enfants ;
+  un élève à ses enseignants ; un enseignant aux parents et élèves de ses classes et à la direction ; la direction aux parents et enseignants de l'école.
+  Un contact hors de cette liste répond `404`. Une seule conversation privée par couple (création idempotente).
+- **Non-lus** : un curseur de lecture par participant ; écrire dans un fil marque comme lu ce qui précède. `GET /threads/unread` alimente la pastille de l'onglet.
+- **Actualisation** par interrogation (pas de WebSocket) : la liste toutes les 10 s, une conversation ouverte toutes les 4 s avec `?after=<rang>`
+  (seuls les nouveaux messages), uniquement écran affiché et application au premier plan. L'envoi est idempotent (`clientId`) et gardé hors ligne.
+- **Images** : une image par message (usage `message` du module de fichiers), lisible des seuls participants du fil.
+- **Web** : la direction dispose d'une page « Messages » (liste, conversation, réponse, nouvelle conversation) ; mobile : onglet Messages des élèves, parents et enseignants.
+- **Limites** : pas de notification poussée (voir #19) ; les messages de l'ancienne messagerie (fils figés par profil, sans participants) ne sont pas repris par la migration `0007`.
 
 ## Base de données
 

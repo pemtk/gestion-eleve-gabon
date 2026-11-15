@@ -50,6 +50,13 @@
       "when": 1794728418110,
       "tag": "0006_fichiers",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794729449528,
+      "tag": "0007_messagerie",
+      "breakpoints": true
     }
   ]
 }
