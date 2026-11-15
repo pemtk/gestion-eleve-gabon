@@ -10,7 +10,10 @@ import {
 } from '@nestjs/common';
 import { z } from 'zod';
 import { CurrentUser, Roles, type AuthUser } from '../common/auth.js';
-import { ConversationsService } from './conversations.service.js';
+import { ConversationContactsService } from './conversation-contacts.service.js';
+import { ConversationMessagesService } from './conversation-messages.service.js';
+import { ConversationThreadsService } from './conversation-threads.service.js';
+import { ConversationUnreadService } from './conversation-unread.service.js';
 
 const messageSchema = z
   .object({
@@ -32,23 +35,28 @@ const readSchema = z.object({ upTo: z.number().int().positive().optional() });
 @Roles('eleve', 'parent', 'enseignant', 'etablissement')
 @Controller('threads')
 export class ConversationsController {
-  constructor(private readonly conversations: ConversationsService) {}
+  constructor(
+    private readonly threadList: ConversationThreadsService,
+    private readonly unreadCount: ConversationUnreadService,
+    private readonly contactBook: ConversationContactsService,
+    private readonly messageService: ConversationMessagesService,
+  ) {}
 
   @Get()
   list(@CurrentUser() user: AuthUser) {
-    return this.conversations.threads(user);
+    return this.threadList.threads(user);
   }
 
   /** Total des messages non lus (pastille de l'onglet Messages). */
   @Get('unread')
   async unread(@CurrentUser() user: AuthUser) {
-    return { total: await this.conversations.unreadTotal(user) };
+    return { total: await this.unreadCount.unreadTotal(user) };
   }
 
   /** Les personnes que l'on peut écrire (et rien d'autre). */
   @Get('contacts')
   async contacts(@CurrentUser() user: AuthUser, @Query('q') q?: string) {
-    return (await this.conversations.contacts(user, q)).map(
+    return (await this.contactBook.contacts(user, q)).map(
       ({ key, name, label, initials }) => ({ key, name, label, initials }),
     );
   }
@@ -60,12 +68,12 @@ export class ConversationsController {
     @CurrentUser() user: AuthUser,
     @Body({ schema: startSchema }) body: z.infer<typeof startSchema>,
   ) {
-    return this.conversations.startPrivate(user, body.contact);
+    return this.contactBook.startPrivate(user, body.contact);
   }
 
   @Get(':id')
   summary(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.conversations.summary(user, id);
+    return this.threadList.summary(user, id);
   }
 
   /** `?after=<seq>` ne retourne que les messages plus récents que le dernier reçu (actualisation). */
@@ -75,7 +83,7 @@ export class ConversationsController {
     @Param('id') id: string,
     @Query('after', new ParseIntPipe({ optional: true })) after?: number,
   ) {
-    return (await this.conversations.messages(user, id, after ?? 0)).messages;
+    return (await this.messageService.messages(user, id, after ?? 0)).messages;
   }
 
   @Post(':id/messages')
@@ -85,7 +93,7 @@ export class ConversationsController {
     @Param('id') id: string,
     @Body({ schema: messageSchema }) body: z.infer<typeof messageSchema>,
   ) {
-    return this.conversations.send(user, id, body);
+    return this.messageService.send(user, id, body);
   }
 
   @Post(':id/read')
@@ -95,6 +103,6 @@ export class ConversationsController {
     @Param('id') id: string,
     @Body({ schema: readSchema }) body: z.infer<typeof readSchema>,
   ) {
-    return this.conversations.markRead(user, id, body.upTo);
+    return this.messageService.markRead(user, id, body.upTo);
   }
 }

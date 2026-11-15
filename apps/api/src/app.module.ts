@@ -51,8 +51,13 @@ import { AdminOrganizationsController } from './admin/admin-organizations.contro
 import { AdminSubscriptionsController } from './admin/admin-subscriptions.controller.js';
 import { AdminUsersController } from './admin/admin-users.controller.js';
 import { AdminOversightController } from './admin/admin-oversight.controller.js';
+import { ConversationGroupsService } from './messaging/conversation-groups.service.js';
+import { ConversationAccessService } from './messaging/conversation-access.service.js';
+import { ConversationUnreadService } from './messaging/conversation-unread.service.js';
+import { ConversationThreadsService } from './messaging/conversation-threads.service.js';
+import { ConversationMessagesService } from './messaging/conversation-messages.service.js';
+import { ConversationContactsService } from './messaging/conversation-contacts.service.js';
 import { ConversationsController } from './messaging/conversations.controller.js';
-import { ConversationsService } from './messaging/conversations.service.js';
 import { NavController } from './nav/nav.controller.js';
 import { NavService } from './nav/nav.service.js';
 import { MessagingController } from './messaging/messaging.controller.js';
@@ -131,7 +136,12 @@ export function jwtSecret(): string {
     TeacherRosterService,
     StudentEnrollmentService,
     ParentChildrenService,
-    ConversationsService,
+    ConversationGroupsService,
+    ConversationAccessService,
+    ConversationUnreadService,
+    ConversationThreadsService,
+    ConversationMessagesService,
+    ConversationContactsService,
     NavService,
     CasesService,
     SchoolPolicy,
