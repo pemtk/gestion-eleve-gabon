@@ -15,7 +15,7 @@
     "@sge/design-tokens": "*",
     "@sge/shared": "*",
     "isbot": "^5.1.36",
-    "lucide-react": "^1.72.0",
+    "lucide-react": "^1.73.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
